@@ -37,7 +37,6 @@ def get_image_base64_url(img_path):
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
 
-# ฟังก์ชันสร้าง SVG Donut Chart แบบสัดส่วน ชนะ/แพ้/เสมอ
 def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
     c = 251.2
     dash_w = (win_rate / 100) * c
@@ -235,7 +234,7 @@ st.markdown(
     """
     <div class="header-box">
         <h1>📊 TRADING PERFORMANCE DASHBOARD & JOURNAL</h1>
-        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบ (ไวคอฟ vs โฟโลเทรน)</p>
+        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบและช่วงเวลา 1 ชั่วโมง</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -249,6 +248,17 @@ if df.empty:
 else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
+
+    # แปลงเวลาเป็นช่วง 1 ชั่วโมง
+    def extract_hour_range(time_str):
+        try:
+            dt = pd.to_datetime(time_str)
+            h = dt.hour
+            return f"{h:02d}:00 - {(h+1)%24:02d}:00"
+        except Exception:
+            return "ไม่ระบุเวลา"
+
+    df_calc["ช่วงเวลา_1ชม"] = df_calc["เวลา"].apply(extract_hour_range)
 
     def calc_net_r(row):
         res = str(row["ผลลัพธ์"]).upper()
@@ -266,8 +276,6 @@ else:
     losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
     bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-    loss_rate = (losses / total_trades) * 100 if total_trades > 0 else 0
-    be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
     m1, m2, m3, m4 = st.columns(4)
@@ -308,9 +316,7 @@ else:
         unsafe_allow_html=True
     )
 
-    # ==============================================================================
-    # ส่วนเปรียบเทียบสถิติและการ์ดแผนภูมิ: ไวคอฟ vs โฟโลเทรน
-    # ==============================================================================
+    # สถิติและแผนภูมิแยกตามระบบเทรด
     st.markdown('<div class="section-title">⚖️ สถิติและแผนภูมิอัตราชนะแยกตามระบบ</div>', unsafe_allow_html=True)
 
     def get_strat_metrics(name_keyword):
@@ -328,7 +334,6 @@ else:
     w_t, w_w, w_l, w_b, w_wr, w_lr, w_br, w_nr = get_strat_metrics("ไวคอฟ")
     f_t, f_w, f_l, f_b, f_wr, f_lr, f_br, f_nr = get_strat_metrics("โฟโลเทรน")
 
-    # แถวเปรียบเทียบ 2 ระบบ พร้อมแผนภูมิวงแหวนกำกับแต่ละฝั่ง
     col_w_box, col_w_chart, col_f_box, col_f_chart = st.columns([1.3, 1, 1.3, 1])
 
     with col_w_box:
@@ -401,33 +406,50 @@ else:
     with col_f_chart:
         st.markdown(render_donut_chart(f_wr, f_lr, f_br, "TREND"), unsafe_allow_html=True)
 
+    # ==============================================================================
+    # ส่วนวิเคราะห์ช่วงเวลา 1 ชั่วโมง (Hourly Win / Loss Analysis)
+    # ==============================================================================
+    st.markdown('<div class="section-title">⏰ สถิติการเทรดแยกตามช่วงเวลา (รอบละ 1 ชั่วโมง)</div>', unsafe_allow_html=True)
+
+    def summarize_hour_group(group):
+        tot = len(group)
+        w = len(group[group["ผลลัพธ์"] == "WIN"])
+        l = len(group[group["ผลลัพธ์"] == "LOSS"])
+        b = len(group[group["ผลลัพธ์"] == "BE"])
+        wr = (w / tot * 100) if tot > 0 else 0.0
+        nr = group["Net_R"].sum()
+        return pd.Series({
+            "จำนวนไม้": tot,
+            "ชนะ (Win)": w,
+            "แพ้ (Loss)": l,
+            "เสมอ (BE)": b,
+            "Win Rate %": f"{wr:.1f}%",
+            "Net R": f"{nr:+.2f} R",
+            "_sort_w": w,
+            "_sort_l": l
+        })
+
+    hourly_summary = df_calc.groupby("ช่วงเวลา_1ชม").apply(summarize_hour_group).reset_index()
+    hourly_summary = hourly_summary.sort_values(by="ช่วงเวลา_1ชม")
+
+    ch1, ch2 = st.columns([1.6, 1.4])
+
+    with ch1:
+        st.write("**📊 แผนภูมิเปรียบเทียบไม้ชนะ และไม้แพ้ในแต่ละชั่วโมง**")
+        chart_bar_df = hourly_summary[["ช่วงเวลา_1ชม", "_sort_w", "_sort_l"]].rename(
+            columns={"_sort_w": "ชนะ (ไม้)", "_sort_l": "แพ้ (ไม้)"}
+        ).set_index("ช่วงเวลา_1ชม")
+        st.bar_chart(chart_bar_df, color=["#22c55e", "#ef4444"])
+
+    with ch2:
+        st.write("**📋 ตารางสรุป Win Rate และผลตอบแทนรายชั่วโมง**")
+        display_hourly = hourly_summary[["ช่วงเวลา_1ชม", "จำนวนไม้", "ชนะ (Win)", "แพ้ (Loss)", "เสมอ (BE)", "Win Rate %", "Net R"]]
+        st.dataframe(display_hourly, use_container_width=True, hide_index=True)
+
     st.write("")
-    c_chart1, c_chart2 = st.columns([1.6, 1.4])
-
-    with c_chart1:
-        st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
-        chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
-        st.line_chart(chart_data)
-
-    with c_chart2:
-        st.markdown('<div class="section-title">📊 ตารางสรุปภาพรวมระบบเทรด</div>', unsafe_allow_html=True)
-        def agg_summary(group):
-            tot = len(group)
-            w = len(group[group["ผลลัพธ์"] == "WIN"])
-            l = len(group[group["ผลลัพธ์"] == "LOSS"])
-            b = len(group[group["ผลลัพธ์"] == "BE"])
-            wr = (w / tot * 100) if tot > 0 else 0
-            nr = group["Net_R"].sum()
-            return pd.Series({
-                "จำนวนไม้": tot,
-                "ชนะ": w,
-                "แพ้": l,
-                "เสมอ": b,
-                "Win Rate %": f"{wr:.1f}%",
-                "Net R รวม": f"{nr:+.2f} R"
-            })
-        strat_table = df_calc.groupby("ระบบเทรด").apply(agg_summary).reset_index()
-        st.dataframe(strat_table, use_container_width=True, hide_index=True)
+    st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
+    chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
+    st.line_chart(chart_data)
 
 # ==============================================================================
 # 2. ส่วนฟอร์มบันทึกการเทรดใหม่
@@ -438,7 +460,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            trade_time = st.text_input("วัน-เวลาที่เทรด", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
+            trade_time = st.text_input("วัน-เวลาที่เทรด (ปี-เดือน-วัน ชม:นาที)", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
             symbol = st.selectbox("สินทรัพย์ที่เทรด", ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"])
             strategy = st.selectbox("ระบบเทรด", ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"])
         with col2:
@@ -490,7 +512,15 @@ else:
         for idx, row in data_subset.iloc[::-1].iterrows():
             trade_id = str(row["id"])
             badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
-            box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
+            
+            # คำนวณช่วง 1 ชม. สำหรับแสดงบนหัวกล่อง
+            try:
+                dt_obj = pd.to_datetime(row["เวลา"])
+                hour_badge = f"⏰ {dt_obj.hour:02d}:00 - {(dt_obj.hour+1)%24:02d}:00"
+            except Exception:
+                hour_badge = ""
+
+            box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  {hour_badge}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
             
             with st.expander(box_title):
                 c1, c2 = st.columns([1, 1])
@@ -500,6 +530,7 @@ else:
                         <div class="trade-card" style="border-left: 5px solid {badge_color} !important;">
                             <p><b>รหัสอ้างอิง:</b> <code style="color:#fb923c;">{trade_id}</code></p>
                             <p><b>วัน-เวลา:</b> {row['เวลา']}</p>
+                            <p><b>ช่วงเวลา:</b> <span style="color:#38bdf8; font-weight:bold;">{hour_badge}</span></p>
                             <p><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
                             <p><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
                             <p><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:800; font-size:16px;">{row['ผลลัพธ์']}</span></p>
