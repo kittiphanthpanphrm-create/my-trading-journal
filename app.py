@@ -38,19 +38,16 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# CSS ปรับแต่งสีและตัวหนังสือให้ชัดเจนทุกจุด
+# CSS สไตล์โมเดิร์น ชัดเจนทุกจุด
 # ==============================================================================
 st.markdown(
     """
     <style>
-    /* ปรับแต่ง Label ของ Input / Select ทุกช่องให้อ่านง่าย ชัดเจน */
     label[data-testid="stWidgetLabel"] p {
         color: #0f172a !important;
         font-size: 15px !important;
         font-weight: 700 !important;
     }
-    
-    /* กล่อง Header ด้านบน */
     .header-box {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid #475569;
@@ -71,8 +68,6 @@ st.markdown(
         font-size: 14px !important;
         margin: 6px 0 0 0 !important;
     }
-    
-    /* แถบหัวข้อ Section */
     .section-title {
         background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid #475569;
@@ -84,8 +79,6 @@ st.markdown(
         font-weight: 800 !important;
         margin: 18px 0 14px 0;
     }
-    
-    /* การ์ดสรุปตัวเลขสถิติ */
     .metric-card {
         background: #1e293b;
         border: 1px solid #475569;
@@ -106,8 +99,40 @@ st.markdown(
         font-weight: 900 !important;
         line-height: 1.2;
     }
-    
-    /* กล่องรายละเอียดประวัติการเทรด */
+    .strategy-card {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 18px 22px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .strategy-header {
+        font-size: 20px;
+        font-weight: 800;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #1e293b;
+        font-size: 15px;
+    }
+    .stat-row:last-child {
+        border-bottom: none;
+    }
+    .stat-label {
+        color: #94a3b8;
+        font-weight: 600;
+    }
+    .stat-val {
+        color: #f8fafc;
+        font-weight: 800;
+    }
     .trade-card {
         background: #0f172a !important;
         padding: 16px 20px !important;
@@ -176,7 +201,7 @@ st.markdown(
     """
     <div class="header-box">
         <h1>📊 TRADING PERFORMANCE DASHBOARD & JOURNAL</h1>
-        <p>ระบบบันทึกการเทรด สถิติภาพรวม อัตราชนะ และวิเคราะห์การเติบโตของพอร์ต</p>
+        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบ (ไวคอฟ vs โฟโลเทรน)</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -207,10 +232,9 @@ else:
     losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
     bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-    loss_rate = (losses / total_trades) * 100 if total_trades > 0 else 0
-    be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
+    # การ์ดสรุปตัวเลข 4 ช่องรวม
     m1, m2, m3, m4 = st.columns(4)
     m1.markdown(
         f"""
@@ -224,7 +248,7 @@ else:
     m2.markdown(
         f"""
         <div class="metric-card">
-            <div class="metric-label">Win Rate (อัตราชนะ)</div>
+            <div class="metric-label">Win Rate รวม</div>
             <div class="metric-value">{win_rate:.1f} %</div>
         </div>
         """,
@@ -233,7 +257,7 @@ else:
     m3.markdown(
         f"""
         <div class="metric-card">
-            <div class="metric-label">ผลรวม R สะสม</div>
+            <div class="metric-label">ผลรวม R สะสมรวม</div>
             <div class="metric-value">{total_r:+.2f} R</div>
         </div>
         """,
@@ -242,12 +266,96 @@ else:
     m4.markdown(
         f"""
         <div class="metric-card">
-            <div class="metric-label">สัดส่วน (ชนะ / แพ้ / เสมอ)</div>
+            <div class="metric-label">สัดส่วนรวม (ชนะ / แพ้ / เสมอ)</div>
             <div class="metric-value" style="font-size:24px;">{wins} / {losses} / {bes}</div>
         </div>
         """,
         unsafe_allow_html=True
     )
+
+    # ==============================================================================
+    # ส่วนเปรียบเทียบสถิติ: ไวคอฟ vs โฟโลเทรน
+    # ==============================================================================
+    st.markdown('<div class="section-title">⚖️ เปรียบเทียบผลลัพธ์: ไวคอฟ (Wyckoff) vs โฟโลเทรน (Follow Trend)</div>', unsafe_allow_html=True)
+
+    def get_strat_metrics(name_keyword):
+        sub = df_calc[df_calc["ระบบเทรด"].str.contains(name_keyword, case=False, na=False)]
+        t = len(sub)
+        w = len(sub[sub["ผลลัพธ์"] == "WIN"])
+        l = len(sub[sub["ผลลัพธ์"] == "LOSS"])
+        b = len(sub[sub["ผลลัพธ์"] == "BE"])
+        wr = (w / t * 100) if t > 0 else 0.0
+        nr = sub["Net_R"].sum() if t > 0 else 0.0
+        return t, w, l, b, wr, nr
+
+    w_t, w_w, w_l, w_b, w_wr, w_nr = get_strat_metrics("ไวคอฟ")
+    f_t, f_w, f_l, f_b, f_wr, f_nr = get_strat_metrics("โฟโลเทรน")
+
+    col_w, col_f = st.columns(2)
+
+    with col_w:
+        st.markdown(
+            f"""
+            <div class="strategy-card" style="border-left: 6px solid #38bdf8;">
+                <div class="strategy-header" style="color: #38bdf8;">
+                    📘 ไวคอฟ (Wyckoff)
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">จำนวนไม้ทั้งหมด:</span>
+                    <span class="stat-val">{w_t} ไม้</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Win Rate:</span>
+                    <span class="stat-val" style="color:#22c55e; font-size:18px;">{w_wr:.1f}%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">ผลลัพธ์ (ชนะ / แพ้ / เสมอ):</span>
+                    <span class="stat-val">
+                        <span style="color:#22c55e;">{w_w}</span> / 
+                        <span style="color:#ef4444;">{w_l}</span> / 
+                        <span style="color:#eab308;">{w_b}</span>
+                    </span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">ผลตอบแทนสุทธิ (Net R):</span>
+                    <span class="stat-val" style="color:#fb923c; font-size:18px;">{w_nr:+.2f} R</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col_f:
+        st.markdown(
+            f"""
+            <div class="strategy-card" style="border-left: 6px solid #ec4899;">
+                <div class="strategy-header" style="color: #ec4899;">
+                    📗 โฟโลเทรน (Follow Trend)
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">จำนวนไม้ทั้งหมด:</span>
+                    <span class="stat-val">{f_t} ไม้</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Win Rate:</span>
+                    <span class="stat-val" style="color:#22c55e; font-size:18px;">{f_wr:.1f}%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">ผลลัพธ์ (ชนะ / แพ้ / เสมอ):</span>
+                    <span class="stat-val">
+                        <span style="color:#22c55e;">{f_w}</span> / 
+                        <span style="color:#ef4444;">{f_l}</span> / 
+                        <span style="color:#eab308;">{f_b}</span>
+                    </span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">ผลตอบแทนสุทธิ (Net R):</span>
+                    <span class="stat-val" style="color:#fb923c; font-size:18px;">{f_nr:+.2f} R</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     st.write("")
     c_chart1, c_chart2 = st.columns([1.8, 1.2])
@@ -257,47 +365,25 @@ else:
         chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
         st.line_chart(chart_data)
 
-        st.markdown('<div class="section-title">🎯 สถิติตามระบบเทรด</div>', unsafe_allow_html=True)
-        strat_summary = df_calc.groupby("ระบบเทรด").agg(
-            จำนวนไม้=("id", "count"),
-            Rรวม=("Net_R", "sum")
-        ).reset_index()
-        st.dataframe(strat_summary, use_container_width=True, hide_index=True)
-
     with c_chart2:
-        st.markdown('<div class="section-title">🥧 แผนภูมิอัตราชนะ (Win / Loss Ratio)</div>', unsafe_allow_html=True)
-        c = 251.2
-        dash_w = (win_rate / 100) * c
-        dash_l = (loss_rate / 100) * c
-        dash_be = (be_rate / 100) * c
-
-        off_w = 0.0
-        off_l = -dash_w
-        off_be = -(dash_w + dash_l)
-
-        svg_html = f"""
-        <div style="background:#1e293b; border:1px solid #475569; border-radius:12px; padding:20px; text-align:center;">
-            <svg width="200" height="200" viewBox="0 0 100 100" style="transform: rotate(-90deg); border-radius: 50%;">
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#334155" stroke-width="16" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" stroke-width="16"
-                        stroke-dasharray="{dash_w} {c}" stroke-dashoffset="{off_w}" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" stroke-width="16"
-                        stroke-dasharray="{dash_l} {c}" stroke-dashoffset="{off_l}" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#eab308" stroke-width="16"
-                        stroke-dasharray="{dash_be} {c}" stroke-dashoffset="{off_be}" />
-            </svg>
-            <div style="margin-top:-125px; margin-bottom:50px;">
-                <span style="font-size:26px; font-weight:900; color:#ffffff;">{win_rate:.1f}%</span><br>
-                <span style="font-size:13px; color:#cbd5e1; font-weight:700;">WIN RATE</span>
-            </div>
-            <div style="display:flex; justify-content:center; gap:16px; font-size:13px; font-weight:700; margin-top:20px;">
-                <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
-                <span style="color:#ef4444;">● แพ้ ({loss_rate:.0f}%)</span>
-                <span style="color:#eab308;">● เสมอ ({be_rate:.0f}%)</span>
-            </div>
-        </div>
-        """
-        st.markdown(svg_html, unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 ตารางแจกแจงตามระบบ</div>', unsafe_allow_html=True)
+        def agg_summary(group):
+            tot = len(group)
+            w = len(group[group["ผลลัพธ์"] == "WIN"])
+            l = len(group[group["ผลลัพธ์"] == "LOSS"])
+            b = len(group[group["ผลลัพธ์"] == "BE"])
+            wr = (w / tot * 100) if tot > 0 else 0
+            nr = group["Net_R"].sum()
+            return pd.Series({
+                "จำนวนไม้": tot,
+                "ชนะ": w,
+                "แพ้": l,
+                "เสมอ": b,
+                "Win Rate %": f"{wr:.1f}%",
+                "Net R รวม": f"{nr:+.2f} R"
+            })
+        strat_table = df_calc.groupby("ระบบเทรด").apply(agg_summary).reset_index()
+        st.dataframe(strat_table, use_container_width=True, hide_index=True)
 
 # ==============================================================================
 # 2. ส่วนฟอร์มบันทึกการเทรดใหม่
@@ -343,92 +429,111 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.rerun()
 
 # ==============================================================================
-# 3. ส่วนประวัติการเทรดทั้งหมด
+# 3. ส่วนประวัติการเทรดทั้งหมด (พร้อมปุ่ม Filter แยกแท็บตามระบบ)
 # ==============================================================================
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
 if df.empty:
     st.caption("ยังไม่มีประวัติการเทรด")
 else:
-    for idx, row in df.iloc[::-1].iterrows():
-        trade_id = str(row["id"])
-        badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
-        box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
-        
-        with st.expander(box_title):
-            c1, c2 = st.columns([1, 1])
-            with c1:
-                st.markdown(
-                    f"""
-                    <div class="trade-card" style="border-left: 5px solid {badge_color} !important;">
-                        <p><b>รหัสอ้างอิง:</b> <code style="color:#fb923c;">{trade_id}</code></p>
-                        <p><b>วัน-เวลา:</b> {row['เวลา']}</p>
-                        <p><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
-                        <p><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
-                        <p><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:800; font-size:16px;">{row['ผลลัพธ์']}</span></p>
-                        <p><b>R:R:</b> {row['R:R']}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+    tab_all, tab_wyckoff, tab_trend = st.tabs(["📂 ดูทั้งหมด", "📘 เฉพาะไวคอฟ (Wyckoff)", "📗 เฉพาะโฟโลเทรน (Follow Trend)"])
 
-                btn_col1, btn_col2 = st.columns(2)
-                with btn_col1:
-                    if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{trade_id}", use_container_width=True):
-                        st.session_state[f"editing_{trade_id}"] = True
-                with btn_col2:
-                    if st.button("🗑️ ลบรายการ", key=f"btn_del_{trade_id}", use_container_width=True):
-                        if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
-                            try:
-                                os.remove(str(row["รูปภาพชาร์ต"]))
-                            except Exception:
-                                pass
-                        df = df[df["id"] != trade_id]
-                        save_data(df)
-                        st.success("ลบรายการเรียบร้อย!")
-                        st.rerun()
+    def render_trade_list(data_subset):
+        if data_subset.empty:
+            st.caption("ไม่มีรายการเทรดในหมวดหมู่นี้")
+            return
 
-            with c2:
-                img_path = str(row["รูปภาพชาร์ต"]).strip()
-                if img_path and os.path.exists(img_path):
-                    st.image(img_path, caption="รูปชาร์ตประกอบ", use_container_width=True)
-                    if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{trade_id}", use_container_width=True):
-                        st.session_state["view_fullscreen_img"] = {
-                            "path": img_path,
-                            "title": f"{row['สินทรัพย์']} | {row['ระบบเทรด']} | {row['ผลลัพธ์']} ({row['เวลา']})"
-                        }
-                        st.rerun()
-                else:
-                    st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
+        for idx, row in data_subset.iloc[::-1].iterrows():
+            trade_id = str(row["id"])
+            badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
+            box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
+            
+            with st.expander(box_title):
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    st.markdown(
+                        f"""
+                        <div class="trade-card" style="border-left: 5px solid {badge_color} !important;">
+                            <p><b>รหัสอ้างอิง:</b> <code style="color:#fb923c;">{trade_id}</code></p>
+                            <p><b>วัน-เวลา:</b> {row['เวลา']}</p>
+                            <p><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
+                            <p><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
+                            <p><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:800; font-size:16px;">{row['ผลลัพธ์']}</span></p>
+                            <p><b>R:R:</b> {row['R:R']}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-            if st.session_state.get(f"editing_{trade_id}", False):
-                st.markdown("---")
-                st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
-                with st.form(key=f"form_edit_{trade_id}"):
-                    e_time = st.text_input("เวลา", value=row["เวลา"])
-                    
-                    symbol_list = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"]
-                    s_idx = symbol_list.index(row["สินทรัพย์"]) if row["สินทรัพย์"] in symbol_list else len(symbol_list)-1
-                    e_symbol = st.selectbox("สินทรัพย์", symbol_list, index=s_idx)
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{trade_id}", use_container_width=True):
+                            st.session_state[f"editing_{trade_id}"] = True
+                    with btn_col2:
+                        if st.button("🗑️ ลบรายการ", key=f"btn_del_{trade_id}", use_container_width=True):
+                            if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
+                                try:
+                                    os.remove(str(row["รูปภาพชาร์ต"]))
+                                except Exception:
+                                    pass
+                            global df
+                            df = df[df["id"] != trade_id]
+                            save_data(df)
+                            st.success("ลบรายการเรียบร้อย!")
+                            st.rerun()
 
-                    strat_list = ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"]
-                    strat_idx = strat_list.index(row["ระบบเทรด"]) if row["ระบบเทรด"] in strat_list else len(strat_list)-1
-                    e_strategy = st.selectbox("ระบบเทรด", strat_list, index=strat_idx)
+                with c2:
+                    img_path = str(row["รูปภาพชาร์ต"]).strip()
+                    if img_path and os.path.exists(img_path):
+                        st.image(img_path, caption="รูปชาร์ตประกอบ", use_container_width=True)
+                        if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{trade_id}", use_container_width=True):
+                            st.session_state["view_fullscreen_img"] = {
+                                "path": img_path,
+                                "title": f"{row['สินทรัพย์']} | {row['ระบบเทรด']} | {row['ผลลัพธ์']} ({row['เวลา']})"
+                            }
+                            st.rerun()
+                    else:
+                        st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
 
-                    res_list = ["WIN", "LOSS", "BE"]
-                    res_idx = res_list.index(row["ผลลัพธ์"]) if row["ผลลัพธ์"] in res_list else 0
-                    e_result = st.selectbox("ผลลัพธ์", res_list, index=res_idx)
+                if st.session_state.get(f"editing_{trade_id}", False):
+                    st.markdown("---")
+                    st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
+                    with st.form(key=f"form_edit_{trade_id}"):
+                        e_time = st.text_input("เวลา", value=row["เวลา"])
+                        
+                        symbol_list = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"]
+                        s_idx = symbol_list.index(row["สินทรัพย์"]) if row["สินทรัพย์"] in symbol_list else len(symbol_list)-1
+                        e_symbol = st.selectbox("สินทรัพย์", symbol_list, index=s_idx)
 
-                    e_rr = st.number_input("R:R", value=float(row["R:R"]) if str(row["R:R"]).replace(".","",1).isdigit() else 1.0, step=0.5)
+                        strat_list = ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"]
+                        strat_idx = strat_list.index(row["ระบบเทรด"]) if row["ระบบเทรด"] in strat_list else len(strat_list)-1
+                        e_strategy = st.selectbox("ระบบเทรด", strat_list, index=strat_idx)
 
-                    save_edit = st.form_submit_button("💾 ยืนยันการแก้ไข", use_container_width=True)
-                    if save_edit:
-                        df.loc[df["id"] == trade_id, "เวลา"] = e_time
-                        df.loc[df["id"] == trade_id, "สินทรัพย์"] = e_symbol
-                        df.loc[df["id"] == trade_id, "ระบบเทรด"] = e_strategy
-                        df.loc[df["id"] == trade_id, "ผลลัพธ์"] = e_result
-                        df.loc[df["id"] == trade_id, "R:R"] = e_rr
-                        save_data(df)
-                        st.session_state[f"editing_{trade_id}"] = False
-                        st.success("อัปเดตข้อมูลสำเร็จ!")
-                        st.rerun()
+                        res_list = ["WIN", "LOSS", "BE"]
+                        res_idx = res_list.index(row["ผลลัพธ์"]) if row["ผลลัพธ์"] in res_list else 0
+                        e_result = st.selectbox("ผลลัพธ์", res_list, index=res_idx)
+
+                        e_rr = st.number_input("R:R", value=float(row["R:R"]) if str(row["R:R"]).replace(".","",1).isdigit() else 1.0, step=0.5)
+
+                        save_edit = st.form_submit_button("💾 ยืนยันการแก้ไข", use_container_width=True)
+                        if save_edit:
+                            df.loc[df["id"] == trade_id, "เวลา"] = e_time
+                            df.loc[df["id"] == trade_id, "สินทรัพย์"] = e_symbol
+                            df.loc[df["id"] == trade_id, "ระบบเทรด"] = e_strategy
+                            df.loc[df["id"] == trade_id, "ผลลัพธ์"] = e_result
+                            df.loc[df["id"] == trade_id, "R:R"] = e_rr
+                            save_data(df)
+                            st.session_state[f"editing_{trade_id}"] = False
+                            st.success("อัปเดตข้อมูลสำเร็จ!")
+                            st.rerun()
+
+    with tab_all:
+        render_trade_list(df)
+
+    with tab_wyckoff:
+        df_wyckoff = df[df["ระบบเทรด"].str.contains("ไวคอฟ", case=False, na=False)]
+        render_trade_list(df_wyckoff)
+
+    with tab_trend:
+        df_trend = df[df["ระบบเทรด"].str.contains("โฟโลเทรน", case=False, na=False)]
+        render_trade_list(df_trend)
