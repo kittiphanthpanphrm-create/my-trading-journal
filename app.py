@@ -4,14 +4,11 @@ from datetime import datetime
 import zoneinfo
 import os
 import base64
+import re
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
-# กำหนด Timezone ประเทศไทย (GMT+7)
 TH_TZ = zoneinfo.ZoneInfo("Asia/Bangkok")
-
-def get_now_th():
-    return datetime.now(TH_TZ)
 
 CSV_FILE = "trades.csv"
 IMAGE_DIR = "trade_images"
@@ -30,6 +27,7 @@ def load_data():
             if col not in df.columns:
                 df[col] = ""
         df["id"] = df["id"].astype(str)
+        df["เวลา"] = df["เวลา"].astype(str)
         return df
     return pd.DataFrame(columns=columns)
 
@@ -43,6 +41,16 @@ def get_image_base64_url(img_path):
     mime = "image/png" if ext == "png" else "image/jpeg"
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
+
+# ฟังก์ชันดึงชั่วโมงแบบอ่านตรงจากข้อความ (พิมพ์ 08 ได้ 08 ไม่โดนเซิร์ฟเวอร์บวกเวลา)
+def extract_hour_range(time_str):
+    time_str = str(time_str).strip()
+    match = re.search(r'(\d{1,2}):(\d{2})', time_str)
+    if match:
+        h = int(match.group(1))
+        h = max(0, min(23, h))
+        return f"{h:02d}:00 - {(h+1)%24:02d}:00"
+    return "ไม่ระบุเวลา"
 
 def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
     c = 251.2
@@ -78,7 +86,7 @@ def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
     """
 
 # ==============================================================================
-# CSS ปรับแต่งสีและเลย์เอาต์
+# CSS สไตล์โมเดิร์น คมชัด
 # ==============================================================================
 st.markdown(
     """
@@ -241,7 +249,7 @@ st.markdown(
     """
     <div class="header-box">
         <h1>📊 TRADING PERFORMANCE DASHBOARD & JOURNAL</h1>
-        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบและช่วงเวลา 1 ชั่วโมง (เวลาประเทศไทย GMT+7)</p>
+        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบและช่วงเวลา 1 ชั่วโมง</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -256,15 +264,7 @@ else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
 
-    # แปลงเวลาเป็นช่วง 1 ชั่วโมง
-    def extract_hour_range(time_str):
-        try:
-            dt = pd.to_datetime(time_str)
-            h = dt.hour
-            return f"{h:02d}:00 - {(h+1)%24:02d}:00"
-        except Exception:
-            return "ไม่ระบุเวลา"
-
+    # คำนวณช่วง 1 ชม. จากค่า String โดยตรง
     df_calc["ช่วงเวลา_1ชม"] = df_calc["เวลา"].apply(extract_hour_range)
 
     def calc_net_r(row):
@@ -462,12 +462,12 @@ else:
 st.markdown('<div class="section-title">📝 บันทึกการเทรดใหม่</div>', unsafe_allow_html=True)
 
 with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอร์มบันทึกข้อมูลไม้ใหม่", expanded=True):
-    with st.form("new_trade_form", clear_on_submit=True):
+    with st.form("new_trade_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
         with col1:
-            # ดึงเวลาปัจจุบันตามเวลาประเทศไทย (Asia/Bangkok)
-            current_time_th = get_now_th().strftime("%Y-%m-%d %H:%M")
-            trade_time = st.text_input("วัน-เวลาที่เทรด (ปี-เดือน-วัน ชม:นาที)", value=current_time_th)
+            # ใช้ค่าปัจจุบันเริ่มแรก แต่เมื่อผู้ใช้แก้จะไม่ถูก reset จนกว่าจะกดยืนยัน
+            default_val = datetime.now(TH_TZ).strftime("%Y-%m-%d %H:%M")
+            trade_time = st.text_input("วัน-เวลาที่เทรด (พิมพ์เองได้อิสระ เช่น 2026-09-15 08:00)", value=default_val)
             symbol = st.selectbox("สินทรัพย์ที่เทรด", ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"])
             strategy = st.selectbox("ระบบเทรด", ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"])
         with col2:
@@ -478,8 +478,11 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
         submitted = st.form_submit_button("💾 ยืนยันบันทึกการเทรด", use_container_width=True)
 
         if submitted:
+            # ตรวจจับข้อความเวลาที่ผู้ใช้พิมพ์
+            cleaned_time = str(trade_time).strip()
             image_path = ""
-            new_id = get_now_th().strftime("%Y%m%d%H%M%S%f")
+            new_id = datetime.now(TH_TZ).strftime("%Y%m%d%H%M%S%f")
+
             if uploaded_image is not None:
                 ext = uploaded_image.name.split(".")[-1]
                 filename = f"{new_id}.{ext}"
@@ -489,7 +492,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
 
             new_row = {
                 "id": new_id,
-                "เวลา": trade_time,
+                "เวลา": cleaned_time,
                 "สินทรัพย์": symbol,
                 "ระบบเทรด": strategy,
                 "ผลลัพธ์": result,
@@ -498,7 +501,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             }
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_data(df)
-            st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว!")
+            st.success(f"✅ บันทึกเวลา {cleaned_time} เรียบร้อยแล้ว!")
             st.rerun()
 
 # ==============================================================================
@@ -519,12 +522,7 @@ else:
         for idx, row in data_subset.iloc[::-1].iterrows():
             trade_id = str(row["id"])
             badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
-            
-            try:
-                dt_obj = pd.to_datetime(row["เวลา"])
-                hour_badge = f"⏰ {dt_obj.hour:02d}:00 - {(dt_obj.hour+1)%24:02d}:00"
-            except Exception:
-                hour_badge = ""
+            hour_badge = f"⏰ {extract_hour_range(row['เวลา'])}"
 
             box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  {hour_badge}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
             
@@ -580,7 +578,7 @@ else:
                     st.markdown("---")
                     st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
                     with st.form(key=f"form_edit_{tab_prefix}_{trade_id}"):
-                        e_time = st.text_input("เวลา", value=row["เวลา"])
+                        e_time = st.text_input("เวลา (พิมพ์เลขที่ต้องการได้เลย เช่น 2026-09-15 08:00)", value=row["เวลา"])
                         
                         symbol_list = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"]
                         s_idx = symbol_list.index(row["สินทรัพย์"]) if row["สินทรัพย์"] in symbol_list else len(symbol_list)-1
@@ -598,7 +596,7 @@ else:
 
                         save_edit = st.form_submit_button("💾 ยืนยันการแก้ไข", use_container_width=True)
                         if save_edit:
-                            df.loc[df["id"] == trade_id, "เวลา"] = e_time
+                            df.loc[df["id"] == trade_id, "เวลา"] = str(e_time).strip()
                             df.loc[df["id"] == trade_id, "สินทรัพย์"] = e_symbol
                             df.loc[df["id"] == trade_id, "ระบบเทรด"] = e_strategy
                             df.loc[df["id"] == trade_id, "ผลลัพธ์"] = e_result
