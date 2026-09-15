@@ -1,10 +1,17 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import zoneinfo
 import os
 import base64
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
+
+# กำหนด Timezone ประเทศไทย (GMT+7)
+TH_TZ = zoneinfo.ZoneInfo("Asia/Bangkok")
+
+def get_now_th():
+    return datetime.now(TH_TZ)
 
 CSV_FILE = "trades.csv"
 IMAGE_DIR = "trade_images"
@@ -71,7 +78,7 @@ def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
     """
 
 # ==============================================================================
-# CSS สไตล์โมเดิร์น คมชัด
+# CSS ปรับแต่งสีและเลย์เอาต์
 # ==============================================================================
 st.markdown(
     """
@@ -234,7 +241,7 @@ st.markdown(
     """
     <div class="header-box">
         <h1>📊 TRADING PERFORMANCE DASHBOARD & JOURNAL</h1>
-        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบและช่วงเวลา 1 ชั่วโมง</p>
+        <p>ระบบบันทึกการเทรดและวิเคราะห์ผลลัพธ์แยกตามระบบและช่วงเวลา 1 ชั่วโมง (เวลาประเทศไทย GMT+7)</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -406,9 +413,7 @@ else:
     with col_f_chart:
         st.markdown(render_donut_chart(f_wr, f_lr, f_br, "TREND"), unsafe_allow_html=True)
 
-    # ==============================================================================
-    # ส่วนวิเคราะห์ช่วงเวลา 1 ชั่วโมง (Hourly Win / Loss Analysis)
-    # ==============================================================================
+    # สถิติรายชั่วโมง
     st.markdown('<div class="section-title">⏰ สถิติการเทรดแยกตามช่วงเวลา (รอบละ 1 ชั่วโมง)</div>', unsafe_allow_html=True)
 
     def summarize_hour_group(group):
@@ -460,7 +465,9 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            trade_time = st.text_input("วัน-เวลาที่เทรด (ปี-เดือน-วัน ชม:นาที)", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
+            # ดึงเวลาปัจจุบันตามเวลาประเทศไทย (Asia/Bangkok)
+            current_time_th = get_now_th().strftime("%Y-%m-%d %H:%M")
+            trade_time = st.text_input("วัน-เวลาที่เทรด (ปี-เดือน-วัน ชม:นาที)", value=current_time_th)
             symbol = st.selectbox("สินทรัพย์ที่เทรด", ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"])
             strategy = st.selectbox("ระบบเทรด", ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"])
         with col2:
@@ -472,7 +479,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
 
         if submitted:
             image_path = ""
-            new_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+            new_id = get_now_th().strftime("%Y%m%d%H%M%S%f")
             if uploaded_image is not None:
                 ext = uploaded_image.name.split(".")[-1]
                 filename = f"{new_id}.{ext}"
@@ -495,7 +502,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.rerun()
 
 # ==============================================================================
-# 3. ส่วนประวัติการเทรดทั้งหมด (แยกแท็บตามระบบ)
+# 3. ส่วนประวัติการเทรดทั้งหมด (แก้ไข/ลบ/ดูรูป)
 # ==============================================================================
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
@@ -513,7 +520,6 @@ else:
             trade_id = str(row["id"])
             badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
             
-            # คำนวณช่วง 1 ชม. สำหรับแสดงบนหัวกล่อง
             try:
                 dt_obj = pd.to_datetime(row["เวลา"])
                 hour_badge = f"⏰ {dt_obj.hour:02d}:00 - {(dt_obj.hour+1)%24:02d}:00"
