@@ -38,7 +38,7 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# CSS สไตล์โมเดิร์น ปรับตัวหนังสือหัวข้อเป็นสีขาวคมชัดพิเศษ
+# CSS สไตล์โมเดิร์น คมชัด อ่านง่ายทุกส่วน
 # ==============================================================================
 st.markdown(
     """
@@ -49,7 +49,7 @@ st.markdown(
         border-left: 8px solid #f97316;
         border-radius: 12px;
         padding: 18px 24px;
-        margin-bottom: 22px;
+        margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }
     .header-box h1 {
@@ -75,25 +75,27 @@ st.markdown(
         font-weight: 800 !important;
         margin: 18px 0 14px 0;
         text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        display: flex;
-        align-items: center;
     }
-    div[data-testid="stMetric"] {
-        background-color: #1e293b !important;
-        border: 1px solid #475569 !important;
-        border-radius: 10px !important;
-        padding: 14px 18px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    .metric-card {
+        background: #1e293b;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        margin-bottom: 12px;
     }
-    div[data-testid="stMetricLabel"] {
-        color: #cbd5e1 !important;
-        font-size: 14px !important;
+    .metric-label {
+        color: #e2e8f0 !important;
+        font-size: 15px !important;
         font-weight: 700 !important;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
     }
-    div[data-testid="stMetricValue"] {
+    .metric-value {
         color: #fb923c !important;
+        font-size: 28px !important;
         font-weight: 900 !important;
-        font-size: 26px !important;
+        line-height: 1.2;
     }
     </style>
     """,
@@ -180,11 +182,44 @@ else:
     be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
+    # การ์ดสถิติแบบ Custom HTML เห็นตัวหนังสือสีขาวและส้มชัดเจน 100%
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
-    m2.metric("Win Rate", f"{win_rate:.1f} %")
-    m3.metric("ผลรวม R สะสม", f"{total_r:+.2f} R")
-    m4.metric("สัดส่วน (W / L / BE)", f"{wins} / {losses} / {bes}")
+    m1.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">จำนวนไม้ทั้งหมด</div>
+            <div class="metric-value">{total_trades} ไม้</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    m2.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">Win Rate (อัตราชนะ)</div>
+            <div class="metric-value">{win_rate:.1f} %</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    m3.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">ผลรวม R สะสม</div>
+            <div class="metric-value">{total_r:+.2f} R</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    m4.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">สัดส่วน (ชนะ / แพ้ / เสมอ)</div>
+            <div class="metric-value" style="font-size:24px;">{wins} / {losses} / {bes}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.write("")
     c_chart1, c_chart2 = st.columns([1.8, 1.2])
@@ -225,7 +260,7 @@ else:
             </svg>
             <div style="margin-top:-125px; margin-bottom:50px;">
                 <span style="font-size:26px; font-weight:900; color:#ffffff;">{win_rate:.1f}%</span><br>
-                <span style="font-size:12px; color:#cbd5e1; font-weight:700;">WIN RATE</span>
+                <span style="font-size:13px; color:#e2e8f0; font-weight:700;">WIN RATE</span>
             </div>
             <div style="display:flex; justify-content:center; gap:16px; font-size:13px; font-weight:700; margin-top:20px;">
                 <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
