@@ -21,6 +21,18 @@ if os.path.exists(CSV_FILE):
 else:
     df = pd.DataFrame(columns=columns)
 
+def get_direct_chart_url(url: str) -> str:
+    """แปลงลิงก์ Snapshot ของ TradingView ให้กลายเป็น URL ไฟล์รูปภาพตรงๆ"""
+    url = url.strip()
+    if not url:
+        return ""
+    if "tradingview.com/x/" in url:
+        # ตัดเอา Snapshot ID เช่น https://www.tradingview.com/x/ABC12345/ -> ABC12345
+        parts = url.rstrip("/").split("/")
+        snap_id = parts[-1]
+        return f"https://s3.tradingview.com/snapshots/{snap_id[0].lower()}/{snap_id}.png"
+    return url
+
 st.title("📈 Trading Journal")
 
 with st.form("trade_form", clear_on_submit=True):
@@ -35,24 +47,21 @@ with st.form("trade_form", clear_on_submit=True):
         result = st.selectbox("ผลลัพธ์", ["WIN", "LOSS", "BE"])
         rr = st.number_input("R:R", value=1.0, step=0.5, format="%.2f")
 
-    # ช่องวางลิงก์รูปภาพจาก TradingView
-    chart_input = st.text_input("🔗 วางลิงก์รูป TradingView (กดปุ่มกล้องบนชาร์ต -> Copy link to image)")
+    chart_input = st.text_input("🔗 วางลิงก์รูป TradingView (กดปุ่มกล้อง -> Copy link to image)")
     uploaded_image = st.file_uploader("หรือเลือกไฟล์จากเครื่อง (ถ้ามี)", type=["png", "jpg", "jpeg"])
 
     submitted = st.form_submit_button("💾 บันทึก", use_container_width=True)
 
     if submitted:
         image_ref = ""
-        # ถ้ามีการอัปโหลดไฟล์ตรงๆ
         if uploaded_image is not None:
             filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_image.name}"
             image_path = os.path.join(IMAGE_DIR, filename)
             with open(image_path, "wb") as f:
                 f.write(uploaded_image.getbuffer())
             image_ref = image_path
-        # ถ้าวางเป็นลิงก์ TradingView
         elif chart_input.strip() != "":
-            image_ref = chart_input.strip()
+            image_ref = get_direct_chart_url(chart_input)
 
         new_row = {
             "เวลา": trade_time,
@@ -69,7 +78,6 @@ with st.form("trade_form", clear_on_submit=True):
 
 st.markdown("---")
 
-# ส่วนแสดงประวัติและรูปภาพ
 st.subheader("📋 ประวัติการเทรด")
 if not df.empty:
     for idx, row in df.iloc[::-1].iterrows():
@@ -83,13 +91,13 @@ if not df.empty:
                 st.write(f"**ผลลัพธ์:** {row['ผลลัพธ์']}")
                 st.write(f"**R:R:** {row['R:R']}")
             with c_right:
-                img_val = str(row["รูปภาพชาร์ต"]).strip()
-                if img_val.startswith("http://") or img_val.startswith("https://"):
-                    # แสดงรูปจากลิงก์ TradingView ทันที
-                    st.image(img_val, caption="ชาร์ต TradingView", use_container_width=True)
-                elif img_val and os.path.exists(img_val):
-                    # แสดงรูปจากไฟล์เครื่อง
-                    st.image(img_val, caption="ชาร์ตประกอบการเทรด", use_container_width=True)
+                raw_img = str(row["รูปภาพชาร์ต"]).strip()
+                img_url = get_direct_chart_url(raw_img)
+                
+                if img_url.startswith("http://") or img_url.startswith("https://"):
+                    st.image(img_url, caption="ชาร์ต TradingView", use_container_width=True)
+                elif img_url and os.path.exists(img_url):
+                    st.image(img_url, caption="ชาร์ตประกอบการเทรด", use_container_width=True)
                 else:
                     st.caption("ไม่มีรูปภาพแนบ")
 else:
