@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import base64
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
@@ -138,7 +138,7 @@ if st.session_state.get("view_fullscreen_img"):
     st.stop()
 
 # ==============================================================================
-# เมนูแถบข้าง (Sidebar Navigation) แยกหน้าอิสระ ไม่ต่อท้ายกัน
+# เมนูแถบข้าง (Sidebar Navigation) แยกหน้าอิสระ
 # ==============================================================================
 with st.sidebar:
     st.markdown(
@@ -157,7 +157,7 @@ with st.sidebar:
     )
 
 # ==============================================================================
-# หน้าที่ 1: แดชบอร์ด & สถิติภาพรวม (Dashboard)
+# หน้าที่ 1: แดชบอร์ด & สถิติภาพรวม
 # ==============================================================================
 if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
     st.markdown(
@@ -219,47 +219,38 @@ if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
         with c_chart2:
             st.markdown('<div class="section-title">🥧 แผนภูมิอัตราชนะ (Win / Loss Ratio)</div>', unsafe_allow_html=True)
             
-            # เตรียมข้อมูลสำหรับ Donut Chart (เขียว ชนะ / แดง แพ้ / เหลือง เสมอ)
+            # วาดแผนภูมิวงกลมด้วย Matplotlib (ไม่ต้องติดตั้งอะไรเพิ่ม)
             counts = df_calc["ผลลัพธ์"].value_counts()
-            labels = []
-            values = []
-            colors = []
-            
-            color_map = {
-                "WIN": "#22c55e",   # เขียว
-                "LOSS": "#ef4444",  # แดง
-                "BE": "#eab308"     # เหลือง
-            }
+            labels, values, colors = [], [], []
+            color_dict = {"WIN": "#22c55e", "LOSS": "#ef4444", "BE": "#eab308"}
 
-            for outcome in ["WIN", "LOSS", "BE"]:
-                if outcome in counts and counts[outcome] > 0:
-                    labels.append(outcome)
-                    values.append(counts[outcome])
-                    colors.append(color_map[outcome])
+            for k in ["WIN", "LOSS", "BE"]:
+                if k in counts and counts[k] > 0:
+                    labels.append(k)
+                    values.append(counts[k])
+                    colors.append(color_dict[k])
 
-            fig = go.Figure(data=[go.Pie(
+            fig, ax = plt.subplots(figsize=(5, 5))
+            fig.patch.set_facecolor('#0e1117')
+            ax.set_facecolor('#0e1117')
+
+            wedges, texts, autotexts = ax.pie(
+                values,
                 labels=labels,
-                values=values,
-                hole=0.55,
-                marker=dict(colors=colors, line=dict(color='#0f172a', width=2)),
-                textinfo='label+percent',
-                textfont=dict(size=14, color='white', family='Arial Black'),
-                hoverinfo='label+value+percent'
-            )])
-
-            fig.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#cbd5e1'),
-                margin=dict(t=20, b=20, l=10, r=10),
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-                annotations=[dict(
-                    text=f"<b>{win_rate:.1f}%</b><br><span style='font-size:12px;color:#94a3b8;'>Win Rate</span>",
-                    x=0.5, y=0.5, font_size=20, showarrow=False, font_color="#f8fafc"
-                )]
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=colors,
+                textprops=dict(color="white", weight="bold", fontsize=11),
+                wedgeprops=dict(width=0.45, edgecolor='#0e1117', linewidth=2)
             )
-            st.plotly_chart(fig, use_container_width=True)
+
+            for at in autotexts:
+                at.set_color('white')
+                at.set_weight('bold')
+
+            # ใส่ตัวเลข Win Rate ตรงกลางวงแหวน
+            ax.text(0, 0, f"{win_rate:.1f}%\nWin Rate", ha='center', va='center', color='white', fontsize=14, weight='bold')
+            st.pyplot(fig, use_container_width=True)
 
 # ==============================================================================
 # หน้าที่ 2: บันทึกการเทรดใหม่
