@@ -8,16 +8,13 @@ st.set_page_config(page_title="Trading Journal", layout="centered")
 CSV_FILE = "trades.csv"
 IMAGE_DIR = "trade_images"
 
-# สร้างโฟลเดอร์เก็บรูปภาพ
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
-# โครงสร้างตาราง
 columns = ["เวลา", "สินทรัพย์", "ระบบเทรด", "ผลลัพธ์", "R:R", "รูปภาพชาร์ต"]
 
 if os.path.exists(CSV_FILE):
     df = pd.read_csv(CSV_FILE)
-    # เพิ่มคอลัมน์ใหม่หากเปิดไฟล์เก่า
     for col in columns:
         if col not in df.columns:
             df[col] = ""
@@ -37,18 +34,25 @@ with st.form("trade_form", clear_on_submit=True):
     with col2:
         result = st.selectbox("ผลลัพธ์", ["WIN", "LOSS", "BE"])
         rr = st.number_input("R:R", value=1.0, step=0.5, format="%.2f")
-        uploaded_image = st.file_uploader("อัปโหลดรูปชาร์ต (PNG, JPG)", type=["png", "jpg", "jpeg"])
+
+    # ช่องวางลิงก์รูปภาพจาก TradingView
+    chart_input = st.text_input("🔗 วางลิงก์รูป TradingView (กดปุ่มกล้องบนชาร์ต -> Copy link to image)")
+    uploaded_image = st.file_uploader("หรือเลือกไฟล์จากเครื่อง (ถ้ามี)", type=["png", "jpg", "jpeg"])
 
     submitted = st.form_submit_button("💾 บันทึก", use_container_width=True)
 
     if submitted:
-        image_path = ""
+        image_ref = ""
+        # ถ้ามีการอัปโหลดไฟล์ตรงๆ
         if uploaded_image is not None:
-            # ตั้งชื่อไฟล์รูปภาพตามเวลาที่บันทึก
             filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_image.name}"
             image_path = os.path.join(IMAGE_DIR, filename)
             with open(image_path, "wb") as f:
                 f.write(uploaded_image.getbuffer())
+            image_ref = image_path
+        # ถ้าวางเป็นลิงก์ TradingView
+        elif chart_input.strip() != "":
+            image_ref = chart_input.strip()
 
         new_row = {
             "เวลา": trade_time,
@@ -56,7 +60,7 @@ with st.form("trade_form", clear_on_submit=True):
             "ระบบเทรด": strategy,
             "ผลลัพธ์": result,
             "R:R": rr,
-            "รูปภาพชาร์ต": image_path
+            "รูปภาพชาร์ต": image_ref
         }
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         df.to_csv(CSV_FILE, index=False)
@@ -65,11 +69,12 @@ with st.form("trade_form", clear_on_submit=True):
 
 st.markdown("---")
 
-# แสดงประวัติการเทรด
+# ส่วนแสดงประวัติและรูปภาพ
 st.subheader("📋 ประวัติการเทรด")
 if not df.empty:
     for idx, row in df.iloc[::-1].iterrows():
-        with st.expander(f"🔹 {row['เวลา']} | {row['สินทรัพย์']} | {row['ระบบเทรด']} | ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"):
+        header_text = f"🔹 {row['เวลา']} | {row['สินทรัพย์']} | {row['ระบบเทรด']} | ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
+        with st.expander(header_text):
             c_left, c_right = st.columns([1, 2])
             with c_left:
                 st.write(f"**เวลา:** {row['เวลา']}")
@@ -78,8 +83,13 @@ if not df.empty:
                 st.write(f"**ผลลัพธ์:** {row['ผลลัพธ์']}")
                 st.write(f"**R:R:** {row['R:R']}")
             with c_right:
-                if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
-                    st.image(row["รูปภาพชาร์ต"], caption="ชาร์ตประกอบการเทรด", use_container_width=True)
+                img_val = str(row["รูปภาพชาร์ต"]).strip()
+                if img_val.startswith("http://") or img_val.startswith("https://"):
+                    # แสดงรูปจากลิงก์ TradingView ทันที
+                    st.image(img_val, caption="ชาร์ต TradingView", use_container_width=True)
+                elif img_val and os.path.exists(img_val):
+                    # แสดงรูปจากไฟล์เครื่อง
+                    st.image(img_val, caption="ชาร์ตประกอบการเทรด", use_container_width=True)
                 else:
                     st.caption("ไม่มีรูปภาพแนบ")
 else:
