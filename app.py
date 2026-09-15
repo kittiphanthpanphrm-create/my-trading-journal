@@ -38,56 +38,62 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# CSS สไตล์โทน Slate Dark & Orange Accent
+# CSS สไตล์โมเดิร์น ปรับตัวหนังสือหัวข้อเป็นสีขาวคมชัดพิเศษ
 # ==============================================================================
 st.markdown(
     """
     <style>
     .header-box {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid #334155;
+        border: 1px solid #475569;
         border-left: 8px solid #f97316;
         border-radius: 12px;
-        padding: 16px 24px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+        padding: 18px 24px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }
     .header-box h1 {
-        color: #f8fafc !important;
-        font-size: 24px !important;
+        color: #ffffff !important;
+        font-size: 26px !important;
         font-weight: 800 !important;
         margin: 0 !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .header-box p {
-        color: #94a3b8 !important;
-        font-size: 13px !important;
-        margin: 4px 0 0 0 !important;
+        color: #cbd5e1 !important;
+        font-size: 14px !important;
+        margin: 6px 0 0 0 !important;
     }
     .section-title {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-left: 5px solid #fb923c;
+        background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid #475569;
+        border-left: 6px solid #f97316;
         border-radius: 8px;
-        padding: 10px 18px;
-        color: #f1f5f9;
-        font-size: 17px;
-        font-weight: 700;
-        margin: 18px 0 12px 0;
+        padding: 12px 20px;
+        color: #ffffff !important;
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        margin: 18px 0 14px 0;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
     }
     div[data-testid="stMetric"] {
         background-color: #1e293b !important;
-        border: 1px solid #334155 !important;
+        border: 1px solid #475569 !important;
         border-radius: 10px !important;
-        padding: 12px 16px !important;
+        padding: 14px 18px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
     }
     div[data-testid="stMetricLabel"] {
-        color: #94a3b8 !important;
-        font-size: 13px !important;
+        color: #cbd5e1 !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
     }
     div[data-testid="stMetricValue"] {
-        color: #f97316 !important;
-        font-weight: 800 !important;
-        font-size: 24px !important;
+        color: #fb923c !important;
+        font-weight: 900 !important;
+        font-size: 26px !important;
     }
     </style>
     """,
@@ -139,7 +145,7 @@ st.markdown(
     """
     <div class="header-box">
         <h1>📊 TRADING PERFORMANCE DASHBOARD & JOURNAL</h1>
-        <p>ระบบบันทึกการเทรด สถิติภาพรวม อัตราชนะ และวิเคราะห์การเติบโตของพอร์ต (Single Page)</p>
+        <p>ระบบบันทึกการเทรด สถิติภาพรวม อัตราชนะ และวิเคราะห์การเติบโตของพอร์ต</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -207,7 +213,7 @@ else:
         off_be = -(dash_w + dash_l)
 
         svg_html = f"""
-        <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px; text-align:center;">
+        <div style="background:#1e293b; border:1px solid #475569; border-radius:12px; padding:20px; text-align:center;">
             <svg width="200" height="200" viewBox="0 0 100 100" style="transform: rotate(-90deg); border-radius: 50%;">
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="#334155" stroke-width="16" />
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" stroke-width="16"
@@ -218,8 +224,8 @@ else:
                         stroke-dasharray="{dash_be} {c}" stroke-dashoffset="{off_be}" />
             </svg>
             <div style="margin-top:-125px; margin-bottom:50px;">
-                <span style="font-size:24px; font-weight:800; color:#f8fafc;">{win_rate:.1f}%</span><br>
-                <span style="font-size:12px; color:#94a3b8; font-weight:600;">WIN RATE</span>
+                <span style="font-size:26px; font-weight:900; color:#ffffff;">{win_rate:.1f}%</span><br>
+                <span style="font-size:12px; color:#cbd5e1; font-weight:700;">WIN RATE</span>
             </div>
             <div style="display:flex; justify-content:center; gap:16px; font-size:13px; font-weight:700; margin-top:20px;">
                 <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
@@ -231,7 +237,7 @@ else:
         st.markdown(svg_html, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. ส่วนฟอร์มบันทึกการเทรดใหม่ (อยู่หน้าเดียวกัน)
+# 2. ส่วนฟอร์มบันทึกการเทรดใหม่
 # ==============================================================================
 st.markdown('<div class="section-title">📝 บันทึกการเทรดใหม่</div>', unsafe_allow_html=True)
 
@@ -274,7 +280,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.rerun()
 
 # ==============================================================================
-# 3. ส่วนประวัติการเทรดทั้งหมด (จัดการ แก้ไข/ลบ/ดูรูป)
+# 3. ส่วนประวัติการเทรดทั้งหมด
 # ==============================================================================
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
