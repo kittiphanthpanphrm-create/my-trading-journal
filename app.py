@@ -37,8 +37,42 @@ def get_image_base64_url(img_path):
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
 
+# ฟังก์ชันสร้าง SVG Donut Chart แบบสัดส่วน ชนะ/แพ้/เสมอ
+def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
+    c = 251.2
+    dash_w = (win_rate / 100) * c
+    dash_l = (loss_rate / 100) * c
+    dash_be = (be_rate / 100) * c
+
+    off_w = 0.0
+    off_l = -dash_w
+    off_be = -(dash_w + dash_l)
+
+    return f"""
+    <div style="background:#1e293b; border:1px solid #475569; border-radius:12px; padding:18px; text-align:center;">
+        <svg width="170" height="170" viewBox="0 0 100 100" style="transform: rotate(-90deg); border-radius: 50%;">
+            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#334155" stroke-width="15" />
+            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" stroke-width="15"
+                    stroke-dasharray="{dash_w} {c}" stroke-dashoffset="{off_w}" />
+            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" stroke-width="15"
+                    stroke-dasharray="{dash_l} {c}" stroke-dashoffset="{off_l}" />
+            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#eab308" stroke-width="15"
+                    stroke-dasharray="{dash_be} {c}" stroke-dashoffset="{off_be}" />
+        </svg>
+        <div style="margin-top:-108px; margin-bottom:40px;">
+            <span style="font-size:24px; font-weight:900; color:#ffffff;">{win_rate:.1f}%</span><br>
+            <span style="font-size:11px; color:#cbd5e1; font-weight:700;">{title}</span>
+        </div>
+        <div style="display:flex; justify-content:center; gap:12px; font-size:12px; font-weight:700; margin-top:15px;">
+            <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
+            <span style="color:#ef4444;">● แพ้ ({loss_rate:.0f}%)</span>
+            <span style="color:#eab308;">● เสมอ ({be_rate:.0f}%)</span>
+        </div>
+    </div>
+    """
+
 # ==============================================================================
-# CSS ปรับแต่งสไตล์ คมชัด สวยงาม
+# CSS สไตล์โมเดิร์น คมชัด
 # ==============================================================================
 st.markdown(
     """
@@ -232,6 +266,8 @@ else:
     losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
     bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+    loss_rate = (losses / total_trades) * 100 if total_trades > 0 else 0
+    be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
     m1, m2, m3, m4 = st.columns(4)
@@ -272,8 +308,10 @@ else:
         unsafe_allow_html=True
     )
 
-    # เปรียบเทียบ ไวคอฟ vs โฟโลเทรน
-    st.markdown('<div class="section-title">⚖️ เปรียบเทียบผลลัพธ์: ไวคอฟ (Wyckoff) vs โฟโลเทรน (Follow Trend)</div>', unsafe_allow_html=True)
+    # ==============================================================================
+    # ส่วนเปรียบเทียบสถิติและการ์ดแผนภูมิ: ไวคอฟ vs โฟโลเทรน
+    # ==============================================================================
+    st.markdown('<div class="section-title">⚖️ สถิติและแผนภูมิอัตราชนะแยกตามระบบ</div>', unsafe_allow_html=True)
 
     def get_strat_metrics(name_keyword):
         sub = df_calc[df_calc["ระบบเทรด"].str.contains(name_keyword, case=False, na=False)]
@@ -282,31 +320,34 @@ else:
         l = len(sub[sub["ผลลัพธ์"] == "LOSS"])
         b = len(sub[sub["ผลลัพธ์"] == "BE"])
         wr = (w / t * 100) if t > 0 else 0.0
+        lr = (l / t * 100) if t > 0 else 0.0
+        br = (b / t * 100) if t > 0 else 0.0
         nr = sub["Net_R"].sum() if t > 0 else 0.0
-        return t, w, l, b, wr, nr
+        return t, w, l, b, wr, lr, br, nr
 
-    w_t, w_w, w_l, w_b, w_wr, w_nr = get_strat_metrics("ไวคอฟ")
-    f_t, f_w, f_l, f_b, f_wr, f_nr = get_strat_metrics("โฟโลเทรน")
+    w_t, w_w, w_l, w_b, w_wr, w_lr, w_br, w_nr = get_strat_metrics("ไวคอฟ")
+    f_t, f_w, f_l, f_b, f_wr, f_lr, f_br, f_nr = get_strat_metrics("โฟโลเทรน")
 
-    col_w, col_f = st.columns(2)
+    # แถวเปรียบเทียบ 2 ระบบ พร้อมแผนภูมิวงแหวนกำกับแต่ละฝั่ง
+    col_w_box, col_w_chart, col_f_box, col_f_chart = st.columns([1.3, 1, 1.3, 1])
 
-    with col_w:
+    with col_w_box:
         st.markdown(
             f"""
-            <div class="strategy-card" style="border-left: 6px solid #38bdf8;">
+            <div class="strategy-card" style="border-left: 6px solid #38bdf8; height: 100%;">
                 <div class="strategy-header" style="color: #38bdf8;">
                     📘 ไวคอฟ (Wyckoff)
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">จำนวนไม้ทั้งหมด:</span>
+                    <span class="stat-label">จำนวนไม้:</span>
                     <span class="stat-val">{w_t} ไม้</span>
                 </div>
                 <div class="stat-row">
                     <span class="stat-label">Win Rate:</span>
-                    <span class="stat-val" style="color:#22c55e; font-size:18px;">{w_wr:.1f}%</span>
+                    <span class="stat-val" style="color:#22c55e; font-size:17px;">{w_wr:.1f}%</span>
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">ผลลัพธ์ (ชนะ / แพ้ / เสมอ):</span>
+                    <span class="stat-label">ชนะ / แพ้ / เสมอ:</span>
                     <span class="stat-val">
                         <span style="color:#22c55e;">{w_w}</span> / 
                         <span style="color:#ef4444;">{w_l}</span> / 
@@ -314,31 +355,34 @@ else:
                     </span>
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">ผลตอบแทนสุทธิ (Net R):</span>
-                    <span class="stat-val" style="color:#fb923c; font-size:18px;">{w_nr:+.2f} R</span>
+                    <span class="stat-label">Net R สะสม:</span>
+                    <span class="stat-val" style="color:#fb923c; font-size:17px;">{w_nr:+.2f} R</span>
                 </div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    with col_f:
+    with col_w_chart:
+        st.markdown(render_donut_chart(w_wr, w_lr, w_br, "WYCKOFF"), unsafe_allow_html=True)
+
+    with col_f_box:
         st.markdown(
             f"""
-            <div class="strategy-card" style="border-left: 6px solid #ec4899;">
+            <div class="strategy-card" style="border-left: 6px solid #ec4899; height: 100%;">
                 <div class="strategy-header" style="color: #ec4899;">
                     📗 โฟโลเทรน (Follow Trend)
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">จำนวนไม้ทั้งหมด:</span>
+                    <span class="stat-label">จำนวนไม้:</span>
                     <span class="stat-val">{f_t} ไม้</span>
                 </div>
                 <div class="stat-row">
                     <span class="stat-label">Win Rate:</span>
-                    <span class="stat-val" style="color:#22c55e; font-size:18px;">{f_wr:.1f}%</span>
+                    <span class="stat-val" style="color:#22c55e; font-size:17px;">{f_wr:.1f}%</span>
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">ผลลัพธ์ (ชนะ / แพ้ / เสมอ):</span>
+                    <span class="stat-label">ชนะ / แพ้ / เสมอ:</span>
                     <span class="stat-val">
                         <span style="color:#22c55e;">{f_w}</span> / 
                         <span style="color:#ef4444;">{f_l}</span> / 
@@ -346,16 +390,19 @@ else:
                     </span>
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">ผลตอบแทนสุทธิ (Net R):</span>
-                    <span class="stat-val" style="color:#fb923c; font-size:18px;">{f_nr:+.2f} R</span>
+                    <span class="stat-label">Net R สะสม:</span>
+                    <span class="stat-val" style="color:#fb923c; font-size:17px;">{f_nr:+.2f} R</span>
                 </div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
+    with col_f_chart:
+        st.markdown(render_donut_chart(f_wr, f_lr, f_br, "TREND"), unsafe_allow_html=True)
+
     st.write("")
-    c_chart1, c_chart2 = st.columns([1.8, 1.2])
+    c_chart1, c_chart2 = st.columns([1.6, 1.4])
 
     with c_chart1:
         st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
@@ -363,7 +410,7 @@ else:
         st.line_chart(chart_data)
 
     with c_chart2:
-        st.markdown('<div class="section-title">📊 ตารางแจกแจงตามระบบ</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 ตารางสรุปภาพรวมระบบเทรด</div>', unsafe_allow_html=True)
         def agg_summary(group):
             tot = len(group)
             w = len(group[group["ผลลัพธ์"] == "WIN"])
@@ -426,7 +473,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.rerun()
 
 # ==============================================================================
-# 3. ส่วนประวัติการเทรดทั้งหมด (แก้ Duplicate Key โดยใส่ tab_prefix)
+# 3. ส่วนประวัติการเทรดทั้งหมด (แยกแท็บตามระบบ)
 # ==============================================================================
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
