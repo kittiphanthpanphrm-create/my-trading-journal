@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import base64
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
@@ -38,12 +39,11 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# Global Custom Theme: โทนเทาส้มโมเดิร์น (Slate & Orange)
+# CSS สไตล์โทนเทาส้มโมเดิร์น (Slate Dark & Orange)
 # ==============================================================================
 st.markdown(
     """
     <style>
-    /* สไตล์การ์ดหัวข้อหลัก */
     .header-box {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border-left: 8px solid #f97316;
@@ -57,18 +57,15 @@ st.markdown(
     }
     .header-box h1 {
         color: #f8fafc !important;
-        font-size: 28px !important;
+        font-size: 26px !important;
         font-weight: 800 !important;
         margin: 0 !important;
-        letter-spacing: 0.5px;
     }
     .header-box p {
         color: #94a3b8 !important;
         font-size: 14px !important;
         margin: 4px 0 0 0 !important;
     }
-
-    /* กล่องหัวข้อย่อย */
     .section-title {
         background: #1e293b;
         border: 1px solid #334155;
@@ -76,15 +73,10 @@ st.markdown(
         border-radius: 8px;
         padding: 10px 18px;
         color: #f1f5f9;
-        font-size: 19px;
+        font-size: 18px;
         font-weight: 700;
         margin: 16px 0 14px 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
     }
-
-    /* การ์ดสถิติ Metric */
     div[data-testid="stMetric"] {
         background-color: #1e293b !important;
         border: 1px solid #334155 !important;
@@ -94,26 +86,13 @@ st.markdown(
     }
     div[data-testid="stMetricLabel"] {
         color: #94a3b8 !important;
-        font-size: 14px !important;
+        font-size: 13px !important;
         font-weight: 600 !important;
     }
     div[data-testid="stMetricValue"] {
         color: #f97316 !important;
         font-weight: 800 !important;
-        font-size: 28px !important;
-    }
-
-    /* ปรับแต่งแท็บด้านล่าง */
-    button[data-baseweb="tab"] {
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        border-radius: 6px 6px 0 0 !important;
-        padding: 10px 20px !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #1e293b !important;
-        color: #f97316 !important;
-        border-bottom: 3px solid #f97316 !important;
+        font-size: 26px !important;
     }
     </style>
     """,
@@ -123,11 +102,10 @@ st.markdown(
 df = load_data()
 
 # ==============================================================================
-# โหมดดูภาพขนาดใหญ่พร้อมระบบซูม (Ultra HD Viewer)
+# โหมดดูภาพขยายขนาดใหญ่ (Ultra HD Viewer)
 # ==============================================================================
 if st.session_state.get("view_fullscreen_img"):
     img_info = st.session_state["view_fullscreen_img"]
-    
     col_btn1, col_btn2, col_zoom = st.columns([1.5, 2, 2.5])
     with col_btn1:
         if st.button("🔙 ✖ ปิดรูปภาพ / กลับหน้าหลัก", use_container_width=True):
@@ -147,7 +125,6 @@ if st.session_state.get("view_fullscreen_img"):
             zoom_level = st.slider("🔍 ขยายขนาดภาพ (Zoom Level)", min_value=100, max_value=300, value=150, step=10, format="%d%%")
 
         st.markdown(f'<div class="section-title">🔍 ตรวจสอบชาร์ต: {img_info["title"]}</div>', unsafe_allow_html=True)
-        
         st.markdown(
             f"""
             <div style="width: 100%; overflow-x: auto; overflow-y: auto; border: 2px solid #334155; border-radius: 10px; padding: 12px; background: #0b1120;">
@@ -158,91 +135,158 @@ if st.session_state.get("view_fullscreen_img"):
         )
     else:
         st.error("ไม่พบไฟล์รูปภาพ")
-    
     st.stop()
 
 # ==============================================================================
-# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด (หัวข้อหลักด้านบน)
+# เมนูแถบข้าง (Sidebar Navigation) แยกหน้าอิสระ ไม่ต่อท้ายกัน
 # ==============================================================================
-st.markdown(
-    """
-    <div class="header-box">
-        <h1>📊 TRADING PERFORMANCE DASHBOARD</h1>
-        <p>ระบบวิเคราะห์สถิติ อัตราชนะ และการเติบโตของพอร์ตการเทรด</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-if df.empty:
-    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปที่แท็บ 'บันทึกการเทรดใหม่' ด้านล่างเพื่อเริ่มบันทึก")
-else:
-    df_calc = df.copy()
-    df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
-
-    def calc_net_r(row):
-        res = str(row["ผลลัพธ์"]).upper()
-        if res == "WIN":
-            return row["R:R"]
-        elif res == "LOSS":
-            return -1.0
-        return 0.0
-
-    df_calc["Net_R"] = df_calc.apply(calc_net_r, axis=1)
-    df_calc["Cumulative_R"] = df_calc["Net_R"].cumsum()
-
-    total_trades = len(df_calc)
-    wins = len(df_calc[df_calc["ผลลัพธ์"] == "WIN"])
-    losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
-    bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
-    win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-    total_r = df_calc["Net_R"].sum()
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
-    m2.metric("Win Rate", f"{win_rate:.1f} %")
-    m3.metric("ผลรวม R รวมสะสม", f"{total_r:+.2f} R")
-    m4.metric("สัดส่วน (W / L / BE)", f"{wins} / {losses} / {bes}")
-
-    st.write("")
-
-    c_chart1, c_chart2 = st.columns([2, 1])
-    with c_chart1:
-        st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
-        chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
-        st.line_chart(chart_data)
-
-    with c_chart2:
-        st.markdown('<div class="section-title">🎯 สัดส่วนผลลัพธ์ & ระบบเทรด</div>', unsafe_allow_html=True)
-        strat_summary = df_calc.groupby("ระบบเทรด").agg(
-            จำนวนไม้=("id", "count"),
-            Rรวม=("Net_R", "sum")
-        ).reset_index()
-        st.dataframe(strat_summary, use_container_width=True, hide_index=True)
-        st.bar_chart(df_calc["ผลลัพธ์"].value_counts())
-
-st.divider()
+with st.sidebar:
+    st.markdown(
+        """
+        <div style="background:#1e293b; padding:12px; border-radius:8px; border-left:4px solid #f97316; margin-bottom:15px;">
+            <b style="color:#f8fafc; font-size:16px;">TRADING JOURNAL</b>
+            <p style="color:#94a3b8; font-size:12px; margin:0;">ระบบบันทึก & วิเคราะห์การเทรด</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    menu = st.radio(
+        "เลือกเมนูการใช้งาน",
+        ["📊 แดชบอร์ด & สถิติภาพรวม", "📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรด & จัดการ"],
+        label_visibility="collapsed"
+    )
 
 # ==============================================================================
-# ส่วนที่ 2: ฟังก์ชันจัดการข้อมูล (อยู่โซนด้านล่าง)
+# หน้าที่ 1: แดชบอร์ด & สถิติภาพรวม (Dashboard)
 # ==============================================================================
-tab_new, tab_history = st.tabs(["📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรดและจัดการ (แก้ไข/ลบ)"])
+if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
+    st.markdown(
+        """
+        <div class="header-box">
+            <h1>📊 TRADING PERFORMANCE DASHBOARD</h1>
+            <p>สถิติภาพรวม อัตราชนะ แผนภูมิวงกลม และการเติบโตของพอร์ต</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-# ----------------- แท็บที่ 1: บันทึกการเทรดใหม่ -----------------
-with tab_new:
-    st.markdown('<div class="section-title">📝 บันทึกข้อมูลไม้ใหม่</div>', unsafe_allow_html=True)
+    if df.empty:
+        st.info("💡 ยังไม่มีข้อมูลในระบบ ให้เลือกเมนู '📝 บันทึกการเทรดใหม่' จากแถบด้านซ้ายเพื่อเริ่มบันทึก")
+    else:
+        df_calc = df.copy()
+        df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
+
+        def calc_net_r(row):
+            res = str(row["ผลลัพธ์"]).upper()
+            if res == "WIN":
+                return row["R:R"]
+            elif res == "LOSS":
+                return -1.0
+            return 0.0
+
+        df_calc["Net_R"] = df_calc.apply(calc_net_r, axis=1)
+        df_calc["Cumulative_R"] = df_calc["Net_R"].cumsum()
+
+        total_trades = len(df_calc)
+        wins = len(df_calc[df_calc["ผลลัพธ์"] == "WIN"])
+        losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
+        bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
+        win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+        total_r = df_calc["Net_R"].sum()
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
+        m2.metric("Win Rate", f"{win_rate:.1f} %")
+        m3.metric("ผลรวม R รวมสะสม", f"{total_r:+.2f} R")
+        m4.metric("สัดส่วน (W / L / BE)", f"{wins} / {losses} / {bes}")
+
+        st.write("")
+
+        c_chart1, c_chart2 = st.columns([1.8, 1.2])
+        
+        with c_chart1:
+            st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
+            chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
+            st.line_chart(chart_data)
+
+            st.markdown('<div class="section-title">🎯 สถิติตามระบบเทรด</div>', unsafe_allow_html=True)
+            strat_summary = df_calc.groupby("ระบบเทรด").agg(
+                จำนวนไม้=("id", "count"),
+                Rรวม=("Net_R", "sum")
+            ).reset_index()
+            st.dataframe(strat_summary, use_container_width=True, hide_index=True)
+
+        with c_chart2:
+            st.markdown('<div class="section-title">🥧 แผนภูมิอัตราชนะ (Win / Loss Ratio)</div>', unsafe_allow_html=True)
+            
+            # เตรียมข้อมูลสำหรับ Donut Chart (เขียว ชนะ / แดง แพ้ / เหลือง เสมอ)
+            counts = df_calc["ผลลัพธ์"].value_counts()
+            labels = []
+            values = []
+            colors = []
+            
+            color_map = {
+                "WIN": "#22c55e",   # เขียว
+                "LOSS": "#ef4444",  # แดง
+                "BE": "#eab308"     # เหลือง
+            }
+
+            for outcome in ["WIN", "LOSS", "BE"]:
+                if outcome in counts and counts[outcome] > 0:
+                    labels.append(outcome)
+                    values.append(counts[outcome])
+                    colors.append(color_map[outcome])
+
+            fig = go.Figure(data=[go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.55,
+                marker=dict(colors=colors, line=dict(color='#0f172a', width=2)),
+                textinfo='label+percent',
+                textfont=dict(size=14, color='white', family='Arial Black'),
+                hoverinfo='label+value+percent'
+            )])
+
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#cbd5e1'),
+                margin=dict(t=20, b=20, l=10, r=10),
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+                annotations=[dict(
+                    text=f"<b>{win_rate:.1f}%</b><br><span style='font-size:12px;color:#94a3b8;'>Win Rate</span>",
+                    x=0.5, y=0.5, font_size=20, showarrow=False, font_color="#f8fafc"
+                )]
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+# ==============================================================================
+# หน้าที่ 2: บันทึกการเทรดใหม่
+# ==============================================================================
+elif menu == "📝 บันทึกการเทรดใหม่":
+    st.markdown(
+        """
+        <div class="header-box">
+            <h1>📝 บันทึกการเทรดใหม่</h1>
+            <p>กรอกข้อมูลออเดอร์ แผน R:R และอัปโหลดภาพชาร์ตบันทึกสถิติ</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            trade_time = st.text_input("เวลา", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
+            trade_time = st.text_input("วัน-เวลาที่เทรด", value=datetime.now().strftime("%Y-%m-%d %H:%M"))
             symbol = st.selectbox("สินทรัพย์ที่เทรด", ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"])
             strategy = st.selectbox("ระบบเทรด", ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"])
         with col2:
             result = st.selectbox("ผลลัพธ์", ["WIN", "LOSS", "BE"])
-            rr = st.number_input("R:R", value=1.0, step=0.5, format="%.2f")
+            rr = st.number_input("R:R (ความคุ้มค่า)", value=1.0, step=0.5, format="%.2f")
             uploaded_image = st.file_uploader("📷 แนบรูปภาพชาร์ต (PNG, JPG)", type=["png", "jpg", "jpeg"])
 
-        submitted = st.form_submit_button("💾 บันทึกการเทรด", use_container_width=True)
+        submitted = st.form_submit_button("💾 ยืนยันบันทึกการเทรด", use_container_width=True)
 
         if submitted:
             image_path = ""
@@ -265,14 +309,24 @@ with tab_new:
             }
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_data(df)
-            st.success("✅ บันทึกข้อมูลเรียบร้อย!")
-            st.rerun()
+            st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว!")
 
-# ----------------- แท็บที่ 2: ประวัติการเทรด & แก้ไข & ลบ -----------------
-with tab_history:
-    st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
+# ==============================================================================
+# หน้าที่ 3: ประวัติการเทรด & จัดการ (แก้ไข/ลบ)
+# ==============================================================================
+elif menu == "📋 ประวัติการเทรด & จัดการ":
+    st.markdown(
+        f"""
+        <div class="header-box">
+            <h1>📋 ประวัติบันทึกการเทรดทั้งหมด</h1>
+            <p>ดูรายการย้อนหลัง ขยายภาพตรวจสอบรายละเอียด และแก้ไข/ลบข้อมูล (ทั้งหมด {len(df)} ไม้)</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     if df.empty:
-        st.info("ยังไม่มีประวัติการเทรด")
+        st.info("ยังไม่มีประวัติการเทรดในระบบ")
     else:
         for idx, row in df.iloc[::-1].iterrows():
             trade_id = str(row["id"])
