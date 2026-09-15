@@ -28,20 +28,25 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
+# ฟังก์ชันเปิดหน้าต่างป๊อปอัปขยายภาพเต็มจอ
+@st.dialog("🔍 ภาพชาร์ตขนาดเต็ม", width="large")
+def show_full_image(img_path, title):
+    st.caption(title)
+    st.image(img_path, use_container_width=True)
+
 df = load_data()
 
 # ==============================================================================
-# ส่วนที่ 1 (หน้าหลักบนสุด): แดชบอร์ดและกราฟสถิติการเทรด
+# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด
 # ==============================================================================
 st.title("📊 Trading Performance Dashboard")
 
 if df.empty:
-    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก ระบบจะเริ่มคำนวณสถิติและวาดกราฟทันที")
+    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก")
 else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
 
-    # คำนวณ R สุทธิ: WIN = +R:R, LOSS = -1.0 R, BE = 0 R
     def calc_net_r(row):
         res = str(row["ผลลัพธ์"]).upper()
         if res == "WIN":
@@ -60,7 +65,6 @@ else:
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
-    # สรุปตัวเลขสำคัญ 4 ช่อง
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
     m2.metric("Win Rate", f"{win_rate:.1f} %")
@@ -69,9 +73,7 @@ else:
 
     st.write("")
 
-    # แถวกราฟหลัก
     c_chart1, c_chart2 = st.columns([2, 1])
-    
     with c_chart1:
         st.subheader("📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)")
         chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
@@ -89,11 +91,11 @@ else:
 st.divider()
 
 # ==============================================================================
-# ส่วนที่ 2 (โซนฟังก์ชันด้านล่าง): บันทึกการเทรด และ ประวัติจัดการข้อมูล
+# ส่วนที่ 2: บันทึกการเทรด และ ประวัติจัดการข้อมูล
 # ==============================================================================
 tab_new, tab_history = st.tabs(["📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรดและจัดการ (แก้ไข/ลบ)"])
 
-# ----------------- แท็บที่ 1: บันทึกการเทรดใหม่ -----------------
+# แท็บ 1: บันทึกการเทรดใหม่
 with tab_new:
     st.subheader("📝 บันทึกการเทรดใหม่")
     with st.form("new_trade_form", clear_on_submit=True):
@@ -133,7 +135,7 @@ with tab_new:
             st.success("✅ บันทึกข้อมูลเรียบร้อย!")
             st.rerun()
 
-# ----------------- แท็บที่ 2: ประวัติการเทรด & แก้ไข & ลบ -----------------
+# แท็บ 2: ประวัติการเทรด & แก้ไข & ลบ
 with tab_history:
     st.subheader("📋 รายการประวัติการเทรดทั้งหมด")
     if df.empty:
@@ -177,10 +179,12 @@ with tab_history:
                     img_path = str(row["รูปภาพชาร์ต"]).strip()
                     if img_path and os.path.exists(img_path):
                         st.image(img_path, caption="รูปชาร์ตประกอบ", use_container_width=True)
+                        # ปุ่มคลิกเพื่อให้เด้งรูปภาพขนาดใหญ่เต็มหน้าจอ
+                        if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{trade_id}", use_container_width=True):
+                            show_full_image(img_path, f"{row['สินทรัพย์']} - {row['ระบบเทรด']} ({row['ผลลัพธ์']})")
                     else:
                         st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
 
-                # ฟอร์มแก้ไขข้อมูลของไม้นั้นๆ
                 if st.session_state.get(f"editing_{trade_id}", False):
                     st.markdown("---")
                     st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
