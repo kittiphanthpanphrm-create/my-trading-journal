@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 
-st.set_page_config(page_title="Pro Trading Journal", layout="wide")
+st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
 CSV_FILE = "trades.csv"
 IMAGE_DIR = "trade_images"
@@ -21,7 +21,6 @@ def load_data():
         for col in columns:
             if col not in df.columns:
                 df[col] = ""
-        # แปลง id ให้เป็น string เสมอเพื่อป้องกันข้อผิดพลาดตอนค้นหา
         df["id"] = df["id"].astype(str)
         return df
     return pd.DataFrame(columns=columns)
@@ -31,20 +30,72 @@ def save_data(df):
 
 df = load_data()
 
-# เมนูนำทางด้านข้าง (Sidebar)
-st.sidebar.title("🧭 เมนูนำทาง")
-menu = st.sidebar.radio(
-    "เลือกหน้าการทำงาน",
-    ["📝 บันทึกการเทรด", "📋 ประวัติและจัดการข้อมูล", "📊 แดชบอร์ดและกราฟสถิติ"]
-)
+# ==============================================================================
+# ส่วนที่ 1 (หน้าหลักบนสุด): แดชบอร์ดและกราฟสถิติการเทรด
+# ==============================================================================
+st.title("📊 Trading Performance Dashboard")
 
-# -------------------------------------------------------------
-# หน้าที่ 1: บันทึกการเทรด
-# -------------------------------------------------------------
-if menu == "📝 บันทึกการเทรด":
-    st.title("📝 บันทึกการเทรดใหม่")
-    st.caption("บันทึกข้อมูลการเข้าเทรดและแนบภาพชาร์ต")
+if df.empty:
+    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก ระบบจะเริ่มคำนวณสถิติและวาดกราฟทันที")
+else:
+    df_calc = df.copy()
+    df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
 
+    # คำนวณ R สุทธิ: WIN = +R:R, LOSS = -1.0 R, BE = 0 R
+    def calc_net_r(row):
+        res = str(row["ผลลัพธ์"]).upper()
+        if res == "WIN":
+            return row["R:R"]
+        elif res == "LOSS":
+            return -1.0
+        return 0.0
+
+    df_calc["Net_R"] = df_calc.apply(calc_net_r, axis=1)
+    df_calc["Cumulative_R"] = df_calc["Net_R"].cumsum()
+
+    total_trades = len(df_calc)
+    wins = len(df_calc[df_calc["ผลลัพธ์"] == "WIN"])
+    losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
+    bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
+    win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+    total_r = df_calc["Net_R"].sum()
+
+    # สรุปตัวเลขสำคัญ 4 ช่อง
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
+    m2.metric("Win Rate", f"{win_rate:.1f} %")
+    m3.metric("ผลรวม R รวมสะสม", f"{total_r:+.2f} R")
+    m4.metric("สัดส่วน (W / L / BE)", f"{wins} / {losses} / {bes}")
+
+    st.write("")
+
+    # แถวกราฟหลัก
+    c_chart1, c_chart2 = st.columns([2, 1])
+    
+    with c_chart1:
+        st.subheader("📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)")
+        chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
+        st.line_chart(chart_data)
+
+    with c_chart2:
+        st.subheader("🎯 สัดส่วนผลลัพธ์ & ระบบเทรด")
+        strat_summary = df_calc.groupby("ระบบเทรด").agg(
+            จำนวนไม้=("id", "count"),
+            Rรวม=("Net_R", "sum")
+        ).reset_index()
+        st.dataframe(strat_summary, use_container_width=True, hide_index=True)
+        st.bar_chart(df_calc["ผลลัพธ์"].value_counts())
+
+st.divider()
+
+# ==============================================================================
+# ส่วนที่ 2 (โซนฟังก์ชันด้านล่าง): บันทึกการเทรด และ ประวัติจัดการข้อมูล
+# ==============================================================================
+tab_new, tab_history = st.tabs(["📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรดและจัดการ (แก้ไข/ลบ)"])
+
+# ----------------- แท็บที่ 1: บันทึกการเทรดใหม่ -----------------
+with tab_new:
+    st.subheader("📝 บันทึกการเทรดใหม่")
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -82,16 +133,13 @@ if menu == "📝 บันทึกการเทรด":
             st.success("✅ บันทึกข้อมูลเรียบร้อย!")
             st.rerun()
 
-# -------------------------------------------------------------
-# หน้าที่ 2: ประวัติการเทรดและจัดการ (แก้ไข / ลบ)
-# -------------------------------------------------------------
-elif menu == "📋 ประวัติและจัดการข้อมูล":
-    st.title("📋 ประวัติการเทรด & การจัดการ")
-    
+# ----------------- แท็บที่ 2: ประวัติการเทรด & แก้ไข & ลบ -----------------
+with tab_history:
+    st.subheader("📋 รายการประวัติการเทรดทั้งหมด")
     if df.empty:
-        st.info("ยังไม่มีข้อมูลการเทรดในระบบ ไปที่หน้า 'บันทึกการเทรด' เพื่อเพิ่มรายการแรก")
+        st.info("ยังไม่มีประวัติการเทรด")
     else:
-        st.write(f"จำนวนการเทรดทั้งหมด: **{len(df)}** ไม้")
+        st.write(f"จำนวนทั้งหมด: **{len(df)}** ไม้")
 
         for idx, row in df.iloc[::-1].iterrows():
             trade_id = str(row["id"])
@@ -110,14 +158,11 @@ elif menu == "📋 ประวัติและจัดการข้อม�
 
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
-                        # ปุ่มเปิดโหมดแก้ไข
                         if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{trade_id}", use_container_width=True):
                             st.session_state[f"editing_{trade_id}"] = True
 
                     with btn_col2:
-                        # ปุ่มลบ
                         if st.button("🗑️ ลบรายการ", key=f"btn_del_{trade_id}", use_container_width=True):
-                            # ลบไฟล์รูปออกจากโฟลเดอร์ (ถ้ามี)
                             if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
                                 try:
                                     os.remove(str(row["รูปภาพชาร์ต"]))
@@ -135,10 +180,10 @@ elif menu == "📋 ประวัติและจัดการข้อม�
                     else:
                         st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
 
-                # ฟอร์มแก้ไขข้อมูลเมื่อกดปุ่ม Edit
+                # ฟอร์มแก้ไขข้อมูลของไม้นั้นๆ
                 if st.session_state.get(f"editing_{trade_id}", False):
                     st.markdown("---")
-                    st.subheader("📝 แก้ไขรายละเอียดของไม้นี้")
+                    st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
                     with st.form(key=f"form_edit_{trade_id}"):
                         e_time = st.text_input("เวลา", value=row["เวลา"])
                         
@@ -156,7 +201,7 @@ elif menu == "📋 ประวัติและจัดการข้อม�
 
                         e_rr = st.number_input("R:R", value=float(row["R:R"]) if str(row["R:R"]).replace(".","",1).isdigit() else 1.0, step=0.5)
 
-                        save_edit = st.form_submit_button("💾 บันทึกการแก้ไข", use_container_width=True)
+                        save_edit = st.form_submit_button("💾 ยืนยันการแก้ไข", use_container_width=True)
                         if save_edit:
                             df.loc[df["id"] == trade_id, "เวลา"] = e_time
                             df.loc[df["id"] == trade_id, "สินทรัพย์"] = e_symbol
@@ -167,67 +212,3 @@ elif menu == "📋 ประวัติและจัดการข้อม�
                             st.session_state[f"editing_{trade_id}"] = False
                             st.success("อัปเดตข้อมูลสำเร็จ!")
                             st.rerun()
-
-# -------------------------------------------------------------
-# หน้าที่ 3: แดชบอร์ดและกราฟสถิติ
-# -------------------------------------------------------------
-elif menu == "📊 แดชบอร์ดและกราฟสถิติ":
-    st.title("📊 แดชบอร์ดและสถิติการเทรด")
-
-    if df.empty:
-        st.info("ยังไม่มีข้อมูลสำหรับวิเคราะห์สถิติ")
-    else:
-        # เตรียมคำนวณสถิติ
-        df_calc = df.copy()
-        df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
-
-        # คำนวณ R สุทธิของแต่ละไม้: WIN = +R:R, LOSS = -1.0 R, BE = 0 R
-        def calc_net_r(row):
-            res = str(row["ผลลัพธ์"]).upper()
-            if res == "WIN":
-                return row["R:R"]
-            elif res == "LOSS":
-                return -1.0
-            return 0.0
-
-        df_calc["Net_R"] = df_calc.apply(calc_net_r, axis=1)
-        df_calc["Cumulative_R"] = df_calc["Net_R"].cumsum()
-
-        total_trades = len(df_calc)
-        wins = len(df_calc[df_calc["ผลลัพธ์"] == "WIN"])
-        losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
-        bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
-        win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-        total_r = df_calc["Net_R"].sum()
-
-        # กล่องสรุปตัวเลขสำคัญ (Metric Cards)
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("จำนวนไม้ทั้งหมด", f"{total_trades} ไม้")
-        m2.metric("Win Rate", f"{win_rate:.1f} %")
-        m3.metric("ผลรวม R รวมทั้งหมด", f"{total_r:+.2f} R")
-        m4.metric("สัดส่วน (W/L/BE)", f"{wins} / {losses} / {bes}")
-
-        st.markdown("---")
-
-        # กราฟ Cumulative Equity Curve (R:R)
-        st.subheader("📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)")
-        chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
-        st.line_chart(chart_data)
-
-        # แยกสถิติตามระบบเทรด (Wyckoff vs Follow Trend)
-        st.markdown("---")
-        st.subheader("🎯 ประสิทธิภาพแยกตามระบบเทรด")
-        col_s1, col_s2 = st.columns(2)
-
-        with col_s1:
-            st.write("**สถิติตามระบบเทรด:**")
-            strat_summary = df_calc.groupby("ระบบเทรด").agg(
-                จำนวนไม้=("id", "count"),
-                Rรวม=("Net_R", "sum")
-            ).reset_index()
-            st.dataframe(strat_summary, use_container_width=True)
-
-        with col_s2:
-            st.write("**สัดส่วนผลลัพธ์ทั้งหมด:**")
-            result_counts = df_calc["ผลลัพธ์"].value_counts()
-            st.bar_chart(result_counts)
