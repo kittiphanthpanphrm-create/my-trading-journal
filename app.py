@@ -38,7 +38,7 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# CSS สไตล์โมเดิร์น ชัดเจนทุกจุด
+# CSS ปรับแต่งสไตล์ คมชัด สวยงาม
 # ==============================================================================
 st.markdown(
     """
@@ -234,7 +234,6 @@ else:
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
-    # การ์ดสรุปตัวเลข 4 ช่องรวม
     m1, m2, m3, m4 = st.columns(4)
     m1.markdown(
         f"""
@@ -273,9 +272,7 @@ else:
         unsafe_allow_html=True
     )
 
-    # ==============================================================================
-    # ส่วนเปรียบเทียบสถิติ: ไวคอฟ vs โฟโลเทรน
-    # ==============================================================================
+    # เปรียบเทียบ ไวคอฟ vs โฟโลเทรน
     st.markdown('<div class="section-title">⚖️ เปรียบเทียบผลลัพธ์: ไวคอฟ (Wyckoff) vs โฟโลเทรน (Follow Trend)</div>', unsafe_allow_html=True)
 
     def get_strat_metrics(name_keyword):
@@ -429,7 +426,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.rerun()
 
 # ==============================================================================
-# 3. ส่วนประวัติการเทรดทั้งหมด (พร้อมปุ่ม Filter แยกแท็บตามระบบ)
+# 3. ส่วนประวัติการเทรดทั้งหมด (แก้ Duplicate Key โดยใส่ tab_prefix)
 # ==============================================================================
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
@@ -438,7 +435,7 @@ if df.empty:
 else:
     tab_all, tab_wyckoff, tab_trend = st.tabs(["📂 ดูทั้งหมด", "📘 เฉพาะไวคอฟ (Wyckoff)", "📗 เฉพาะโฟโลเทรน (Follow Trend)"])
 
-    def render_trade_list(data_subset):
+    def render_trade_list(data_subset, tab_prefix):
         if data_subset.empty:
             st.caption("ไม่มีรายการเทรดในหมวดหมู่นี้")
             return
@@ -467,10 +464,10 @@ else:
 
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
-                        if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{trade_id}", use_container_width=True):
-                            st.session_state[f"editing_{trade_id}"] = True
+                        if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{tab_prefix}_{trade_id}", use_container_width=True):
+                            st.session_state[f"editing_{tab_prefix}_{trade_id}"] = True
                     with btn_col2:
-                        if st.button("🗑️ ลบรายการ", key=f"btn_del_{trade_id}", use_container_width=True):
+                        if st.button("🗑️ ลบรายการ", key=f"btn_del_{tab_prefix}_{trade_id}", use_container_width=True):
                             if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
                                 try:
                                     os.remove(str(row["รูปภาพชาร์ต"]))
@@ -486,7 +483,7 @@ else:
                     img_path = str(row["รูปภาพชาร์ต"]).strip()
                     if img_path and os.path.exists(img_path):
                         st.image(img_path, caption="รูปชาร์ตประกอบ", use_container_width=True)
-                        if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{trade_id}", use_container_width=True):
+                        if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{tab_prefix}_{trade_id}", use_container_width=True):
                             st.session_state["view_fullscreen_img"] = {
                                 "path": img_path,
                                 "title": f"{row['สินทรัพย์']} | {row['ระบบเทรด']} | {row['ผลลัพธ์']} ({row['เวลา']})"
@@ -495,10 +492,10 @@ else:
                     else:
                         st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
 
-                if st.session_state.get(f"editing_{trade_id}", False):
+                if st.session_state.get(f"editing_{tab_prefix}_{trade_id}", False):
                     st.markdown("---")
                     st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
-                    with st.form(key=f"form_edit_{trade_id}"):
+                    with st.form(key=f"form_edit_{tab_prefix}_{trade_id}"):
                         e_time = st.text_input("เวลา", value=row["เวลา"])
                         
                         symbol_list = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"]
@@ -523,17 +520,17 @@ else:
                             df.loc[df["id"] == trade_id, "ผลลัพธ์"] = e_result
                             df.loc[df["id"] == trade_id, "R:R"] = e_rr
                             save_data(df)
-                            st.session_state[f"editing_{trade_id}"] = False
+                            st.session_state[f"editing_{tab_prefix}_{trade_id}"] = False
                             st.success("อัปเดตข้อมูลสำเร็จ!")
                             st.rerun()
 
     with tab_all:
-        render_trade_list(df)
+        render_trade_list(df, "all")
 
     with tab_wyckoff:
         df_wyckoff = df[df["ระบบเทรด"].str.contains("ไวคอฟ", case=False, na=False)]
-        render_trade_list(df_wyckoff)
+        render_trade_list(df_wyckoff, "wyckoff")
 
     with tab_trend:
         df_trend = df[df["ระบบเทรด"].str.contains("โฟโลเทรน", case=False, na=False)]
-        render_trade_list(df_trend)
+        render_trade_list(df_trend, "trend")
