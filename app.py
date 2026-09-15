@@ -29,7 +29,6 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# แปลงรูปภาพเป็น Base64 เพื่อให้คลิกเปิดดูขนาดจริง 4K ในแท็บใหม่ได้
 def get_image_base64_url(img_path):
     with open(img_path, "rb") as f:
         data = f.read()
@@ -37,6 +36,89 @@ def get_image_base64_url(img_path):
     mime = "image/png" if ext == "png" else "image/jpeg"
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
+
+# ==============================================================================
+# Global Custom Theme: โทนเทาส้มโมเดิร์น (Slate & Orange)
+# ==============================================================================
+st.markdown(
+    """
+    <style>
+    /* สไตล์การ์ดหัวข้อหลัก */
+    .header-box {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border-left: 8px solid #f97316;
+        border-top: 1px solid #334155;
+        border-right: 1px solid #334155;
+        border-bottom: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px 24px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+    }
+    .header-box h1 {
+        color: #f8fafc !important;
+        font-size: 28px !important;
+        font-weight: 800 !important;
+        margin: 0 !important;
+        letter-spacing: 0.5px;
+    }
+    .header-box p {
+        color: #94a3b8 !important;
+        font-size: 14px !important;
+        margin: 4px 0 0 0 !important;
+    }
+
+    /* กล่องหัวข้อย่อย */
+    .section-title {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-left: 5px solid #fb923c;
+        border-radius: 8px;
+        padding: 10px 18px;
+        color: #f1f5f9;
+        font-size: 19px;
+        font-weight: 700;
+        margin: 16px 0 14px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* การ์ดสถิติ Metric */
+    div[data-testid="stMetric"] {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
+        padding: 14px 18px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #f97316 !important;
+        font-weight: 800 !important;
+        font-size: 28px !important;
+    }
+
+    /* ปรับแต่งแท็บด้านล่าง */
+    button[data-baseweb="tab"] {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border-radius: 6px 6px 0 0 !important;
+        padding: 10px 20px !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #1e293b !important;
+        color: #f97316 !important;
+        border-bottom: 3px solid #f97316 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 df = load_data()
 
@@ -57,19 +139,18 @@ if st.session_state.get("view_fullscreen_img"):
         with col_btn2:
             st.markdown(
                 f'<a href="{img_data_url}" target="_blank" style="text-decoration:none;">'
-                f'<button style="width:100%;height:38px;background-color:#0284c7;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">'
-                f'↗️ เปิดรูปต้นฉบับ 4K ในแท็บใหม่ (คลิกซูมได้)</button></a>',
+                f'<button style="width:100%;height:38px;background-color:#ea580c;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">'
+                f'↗️ เปิดรูปต้นฉบับในแท็บใหม่ (คลิกซูมได้)</button></a>',
                 unsafe_allow_html=True
             )
         with col_zoom:
             zoom_level = st.slider("🔍 ขยายขนาดภาพ (Zoom Level)", min_value=100, max_value=300, value=150, step=10, format="%d%%")
 
-        st.subheader(f"🔍 ชาร์ต: {img_info['title']}")
+        st.markdown(f'<div class="section-title">🔍 ตรวจสอบชาร์ต: {img_info["title"]}</div>', unsafe_allow_html=True)
         
-        # กล่องแสดงผลแบบมี Scrollbar เลื่อนซ้ายขวาได้อิสระ ไม่บีบตัวหนังสือ
         st.markdown(
             f"""
-            <div style="width: 100%; overflow-x: auto; overflow-y: auto; border: 1px solid #334155; border-radius: 8px; padding: 10px; background: #0f172a;">
+            <div style="width: 100%; overflow-x: auto; overflow-y: auto; border: 2px solid #334155; border-radius: 10px; padding: 12px; background: #0b1120;">
                 <img src="{img_data_url}" style="width: {zoom_level}%; max-width: none; height: auto; display: block;" />
             </div>
             """,
@@ -81,12 +162,20 @@ if st.session_state.get("view_fullscreen_img"):
     st.stop()
 
 # ==============================================================================
-# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด
+# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด (หัวข้อหลักด้านบน)
 # ==============================================================================
-st.title("📊 Trading Performance Dashboard")
+st.markdown(
+    """
+    <div class="header-box">
+        <h1>📊 TRADING PERFORMANCE DASHBOARD</h1>
+        <p>ระบบวิเคราะห์สถิติ อัตราชนะ และการเติบโตของพอร์ตการเทรด</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 if df.empty:
-    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก")
+    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปที่แท็บ 'บันทึกการเทรดใหม่' ด้านล่างเพื่อเริ่มบันทึก")
 else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
@@ -119,12 +208,12 @@ else:
 
     c_chart1, c_chart2 = st.columns([2, 1])
     with c_chart1:
-        st.subheader("📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)")
+        st.markdown('<div class="section-title">📈 กราฟการเติบโตของพอร์ต (Cumulative R:R Curve)</div>', unsafe_allow_html=True)
         chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
         st.line_chart(chart_data)
 
     with c_chart2:
-        st.subheader("🎯 สัดส่วนผลลัพธ์ & ระบบเทรด")
+        st.markdown('<div class="section-title">🎯 สัดส่วนผลลัพธ์ & ระบบเทรด</div>', unsafe_allow_html=True)
         strat_summary = df_calc.groupby("ระบบเทรด").agg(
             จำนวนไม้=("id", "count"),
             Rรวม=("Net_R", "sum")
@@ -135,12 +224,13 @@ else:
 st.divider()
 
 # ==============================================================================
-# ส่วนที่ 2: บันทึกการเทรด และ ประวัติจัดการข้อมูล
+# ส่วนที่ 2: ฟังก์ชันจัดการข้อมูล (อยู่โซนด้านล่าง)
 # ==============================================================================
 tab_new, tab_history = st.tabs(["📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรดและจัดการ (แก้ไข/ลบ)"])
 
+# ----------------- แท็บที่ 1: บันทึกการเทรดใหม่ -----------------
 with tab_new:
-    st.subheader("📝 บันทึกการเทรดใหม่")
+    st.markdown('<div class="section-title">📝 บันทึกข้อมูลไม้ใหม่</div>', unsafe_allow_html=True)
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -178,27 +268,34 @@ with tab_new:
             st.success("✅ บันทึกข้อมูลเรียบร้อย!")
             st.rerun()
 
+# ----------------- แท็บที่ 2: ประวัติการเทรด & แก้ไข & ลบ -----------------
 with tab_history:
-    st.subheader("📋 รายการประวัติการเทรดทั้งหมด")
+    st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
     if df.empty:
         st.info("ยังไม่มีประวัติการเทรด")
     else:
-        st.write(f"จำนวนทั้งหมด: **{len(df)}** ไม้")
-
         for idx, row in df.iloc[::-1].iterrows():
             trade_id = str(row["id"])
-            box_title = f"ไม้ {row['เวลา']} | {row['สินทรัพย์']} | {row['ระบบเทรด']} | ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
+            badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
+            box_title = f"ไม้ {row['เวลา']}  |  {row['สินทรัพย์']}  |  {row['ระบบเทรด']}  |  ผลลัพธ์: {row['ผลลัพธ์']} (R:R: {row['R:R']})"
             
             with st.expander(box_title):
                 c1, c2 = st.columns([1, 1])
                 
                 with c1:
-                    st.write(f"**รหัสอ้างอิง:** `{trade_id}`")
-                    st.write(f"**เวลา:** {row['เวลา']}")
-                    st.write(f"**สินทรัพย์:** {row['สินทรัพย์']}")
-                    st.write(f"**ระบบเทรด:** {row['ระบบเทรด']}")
-                    st.write(f"**ผลลัพธ์:** {row['ผลลัพธ์']}")
-                    st.write(f"**R:R:** {row['R:R']}")
+                    st.markdown(
+                        f"""
+                        <div style="background:#0f172a; padding:14px; border-radius:8px; border-left:4px solid {badge_color}; margin-bottom:12px;">
+                            <p style="margin:2px 0;"><b>รหัสอ้างอิง:</b> <code>{trade_id}</code></p>
+                            <p style="margin:2px 0;"><b>เวลา:</b> {row['เวลา']}</p>
+                            <p style="margin:2px 0;"><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
+                            <p style="margin:2px 0;"><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
+                            <p style="margin:2px 0;"><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:bold;">{row['ผลลัพธ์']}</span></p>
+                            <p style="margin:2px 0;"><b>R:R:</b> {row['R:R']}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
