@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 import os
 import base64
-import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
@@ -38,22 +37,16 @@ def get_image_base64_url(img_path):
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
 
-# ==============================================================================
-# CSS สไตล์โทนเทาส้มโมเดิร์น (Slate Dark & Orange)
-# ==============================================================================
 st.markdown(
     """
     <style>
     .header-box {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid #334155;
         border-left: 8px solid #f97316;
-        border-top: 1px solid #334155;
-        border-right: 1px solid #334155;
-        border-bottom: 1px solid #334155;
         border-radius: 12px;
         padding: 16px 24px;
         margin-bottom: 22px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
     }
     .header-box h1 {
         color: #f8fafc !important;
@@ -82,12 +75,10 @@ st.markdown(
         border: 1px solid #334155 !important;
         border-radius: 10px !important;
         padding: 14px 18px !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
     }
     div[data-testid="stMetricLabel"] {
         color: #94a3b8 !important;
         font-size: 13px !important;
-        font-weight: 600 !important;
     }
     div[data-testid="stMetricValue"] {
         color: #f97316 !important;
@@ -101,9 +92,6 @@ st.markdown(
 
 df = load_data()
 
-# ==============================================================================
-# โหมดดูภาพขยายขนาดใหญ่ (Ultra HD Viewer)
-# ==============================================================================
 if st.session_state.get("view_fullscreen_img"):
     img_info = st.session_state["view_fullscreen_img"]
     col_btn1, col_btn2, col_zoom = st.columns([1.5, 2, 2.5])
@@ -118,16 +106,16 @@ if st.session_state.get("view_fullscreen_img"):
             st.markdown(
                 f'<a href="{img_data_url}" target="_blank" style="text-decoration:none;">'
                 f'<button style="width:100%;height:38px;background-color:#ea580c;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">'
-                f'↗️ เปิดรูปต้นฉบับในแท็บใหม่ (คลิกซูมได้)</button></a>',
+                f'↗️ เปิดรูปต้นฉบับในแท็บใหม่</button></a>',
                 unsafe_allow_html=True
             )
         with col_zoom:
-            zoom_level = st.slider("🔍 ขยายขนาดภาพ (Zoom Level)", min_value=100, max_value=300, value=150, step=10, format="%d%%")
+            zoom_level = st.slider("🔍 ขยายขนาดภาพ", min_value=100, max_value=300, value=150, step=10, format="%d%%")
 
         st.markdown(f'<div class="section-title">🔍 ตรวจสอบชาร์ต: {img_info["title"]}</div>', unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div style="width: 100%; overflow-x: auto; overflow-y: auto; border: 2px solid #334155; border-radius: 10px; padding: 12px; background: #0b1120;">
+            <div style="width: 100%; overflow: auto; border: 2px solid #334155; border-radius: 10px; padding: 12px; background: #0b1120;">
                 <img src="{img_data_url}" style="width: {zoom_level}%; max-width: none; height: auto; display: block;" />
             </div>
             """,
@@ -137,9 +125,6 @@ if st.session_state.get("view_fullscreen_img"):
         st.error("ไม่พบไฟล์รูปภาพ")
     st.stop()
 
-# ==============================================================================
-# เมนูแถบข้าง (Sidebar Navigation) แยกหน้าอิสระ
-# ==============================================================================
 with st.sidebar:
     st.markdown(
         """
@@ -156,9 +141,6 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# ==============================================================================
-# หน้าที่ 1: แดชบอร์ด & สถิติภาพรวม
-# ==============================================================================
 if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
     st.markdown(
         """
@@ -192,6 +174,8 @@ if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
         losses = len(df_calc[df_calc["ผลลัพธ์"] == "LOSS"])
         bes = len(df_calc[df_calc["ผลลัพธ์"] == "BE"])
         win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+        loss_rate = (losses / total_trades) * 100 if total_trades > 0 else 0
+        be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
         total_r = df_calc["Net_R"].sum()
 
         m1, m2, m3, m4 = st.columns(4)
@@ -201,7 +185,6 @@ if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
         m4.metric("สัดส่วน (W / L / BE)", f"{wins} / {losses} / {bes}")
 
         st.write("")
-
         c_chart1, c_chart2 = st.columns([1.8, 1.2])
         
         with c_chart1:
@@ -218,43 +201,39 @@ if menu == "📊 แดชบอร์ด & สถิติภาพรวม":
 
         with c_chart2:
             st.markdown('<div class="section-title">🥧 แผนภูมิอัตราชนะ (Win / Loss Ratio)</div>', unsafe_allow_html=True)
-            
-            # วาดแผนภูมิวงกลมด้วย Matplotlib (ไม่ต้องติดตั้งอะไรเพิ่ม)
-            counts = df_calc["ผลลัพธ์"].value_counts()
-            labels, values, colors = [], [], []
-            color_dict = {"WIN": "#22c55e", "LOSS": "#ef4444", "BE": "#eab308"}
+            c = 251.2
+            dash_w = (win_rate / 100) * c
+            dash_l = (loss_rate / 100) * c
+            dash_be = (be_rate / 100) * c
 
-            for k in ["WIN", "LOSS", "BE"]:
-                if k in counts and counts[k] > 0:
-                    labels.append(k)
-                    values.append(counts[k])
-                    colors.append(color_dict[k])
+            off_w = 0.0
+            off_l = -dash_w
+            off_be = -(dash_w + dash_l)
 
-            fig, ax = plt.subplots(figsize=(5, 5))
-            fig.patch.set_facecolor('#0e1117')
-            ax.set_facecolor('#0e1117')
+            svg_html = f"""
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px; text-align:center;">
+                <svg width="200" height="200" viewBox="0 0 100 100" style="transform: rotate(-90deg); border-radius: 50%;">
+                    <circle cx="50" cy="50" r="40" fill="transparent" stroke="#334155" stroke-width="16" />
+                    <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" stroke-width="16"
+                            stroke-dasharray="{dash_w} {c}" stroke-dashoffset="{off_w}" />
+                    <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" stroke-width="16"
+                            stroke-dasharray="{dash_l} {c}" stroke-dashoffset="{off_l}" />
+                    <circle cx="50" cy="50" r="40" fill="transparent" stroke="#eab308" stroke-width="16"
+                            stroke-dasharray="{dash_be} {c}" stroke-dashoffset="{off_be}" />
+                </svg>
+                <div style="margin-top:-125px; margin-bottom:50px;">
+                    <span style="font-size:24px; font-weight:800; color:#f8fafc;">{win_rate:.1f}%</span><br>
+                    <span style="font-size:12px; color:#94a3b8; font-weight:600;">WIN RATE</span>
+                </div>
+                <div style="display:flex; justify-content:center; gap:16px; font-size:13px; font-weight:700; margin-top:20px;">
+                    <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
+                    <span style="color:#ef4444;">● แพ้ ({loss_rate:.0f}%)</span>
+                    <span style="color:#eab308;">● เสมอ ({be_rate:.0f}%)</span>
+                </div>
+            </div>
+            """
+            st.markdown(svg_html, unsafe_allow_html=True)
 
-            wedges, texts, autotexts = ax.pie(
-                values,
-                labels=labels,
-                autopct='%1.1f%%',
-                startangle=90,
-                colors=colors,
-                textprops=dict(color="white", weight="bold", fontsize=11),
-                wedgeprops=dict(width=0.45, edgecolor='#0e1117', linewidth=2)
-            )
-
-            for at in autotexts:
-                at.set_color('white')
-                at.set_weight('bold')
-
-            # ใส่ตัวเลข Win Rate ตรงกลางวงแหวน
-            ax.text(0, 0, f"{win_rate:.1f}%\nWin Rate", ha='center', va='center', color='white', fontsize=14, weight='bold')
-            st.pyplot(fig, use_container_width=True)
-
-# ==============================================================================
-# หน้าที่ 2: บันทึกการเทรดใหม่
-# ==============================================================================
 elif menu == "📝 บันทึกการเทรดใหม่":
     st.markdown(
         """
@@ -302,9 +281,6 @@ elif menu == "📝 บันทึกการเทรดใหม่":
             save_data(df)
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว!")
 
-# ==============================================================================
-# หน้าที่ 3: ประวัติการเทรด & จัดการ (แก้ไข/ลบ)
-# ==============================================================================
 elif menu == "📋 ประวัติการเทรด & จัดการ":
     st.markdown(
         f"""
@@ -326,7 +302,6 @@ elif menu == "📋 ประวัติการเทรด & จัดกา�
             
             with st.expander(box_title):
                 c1, c2 = st.columns([1, 1])
-                
                 with c1:
                     st.markdown(
                         f"""
@@ -346,7 +321,6 @@ elif menu == "📋 ประวัติการเทรด & จัดกา�
                     with btn_col1:
                         if st.button("✏️ แก้ไขข้อมูล", key=f"btn_edit_{trade_id}", use_container_width=True):
                             st.session_state[f"editing_{trade_id}"] = True
-
                     with btn_col2:
                         if st.button("🗑️ ลบรายการ", key=f"btn_del_{trade_id}", use_container_width=True):
                             if row["รูปภาพชาร์ต"] and os.path.exists(str(row["รูปภาพชาร์ต"])):
