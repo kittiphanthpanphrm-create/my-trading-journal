@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+import base64
 
 st.set_page_config(page_title="Trading Dashboard & Journal", layout="wide")
 
@@ -28,35 +29,64 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
+# แปลงรูปภาพเป็น Base64 เพื่อให้คลิกเปิดดูขนาดจริง 4K ในแท็บใหม่ได้
+def get_image_base64_url(img_path):
+    with open(img_path, "rb") as f:
+        data = f.read()
+    ext = img_path.split(".")[-1].lower()
+    mime = "image/png" if ext == "png" else "image/jpeg"
+    encoded = base64.b64encode(data).decode()
+    return f"data:{mime};base64,{encoded}"
+
 df = load_data()
 
 # ==============================================================================
-# โหมดดูภาพขนาดใหญ่เต็มจอ (Full View Mode)
+# โหมดดูภาพขนาดใหญ่พร้อมระบบซูม (Ultra HD Viewer)
 # ==============================================================================
 if st.session_state.get("view_fullscreen_img"):
     img_info = st.session_state["view_fullscreen_img"]
     
-    col_btn, _ = st.columns([1, 4])
-    with col_btn:
+    col_btn1, col_btn2, col_zoom = st.columns([1.5, 2, 2.5])
+    with col_btn1:
         if st.button("🔙 ✖ ปิดรูปภาพ / กลับหน้าหลัก", use_container_width=True):
             st.session_state["view_fullscreen_img"] = None
             st.rerun()
 
-    st.subheader(f"🔍 รายละเอียดชาร์ต: {img_info['title']}")
     if os.path.exists(img_info["path"]):
-        st.image(img_info["path"], use_container_width=True)
+        img_data_url = get_image_base64_url(img_info["path"])
+        with col_btn2:
+            st.markdown(
+                f'<a href="{img_data_url}" target="_blank" style="text-decoration:none;">'
+                f'<button style="width:100%;height:38px;background-color:#0284c7;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">'
+                f'↗️ เปิดรูปต้นฉบับ 4K ในแท็บใหม่ (คลิกซูมได้)</button></a>',
+                unsafe_allow_html=True
+            )
+        with col_zoom:
+            zoom_level = st.slider("🔍 ขยายขนาดภาพ (Zoom Level)", min_value=100, max_value=300, value=150, step=10, format="%d%%")
+
+        st.subheader(f"🔍 ชาร์ต: {img_info['title']}")
+        
+        # กล่องแสดงผลแบบมี Scrollbar เลื่อนซ้ายขวาได้อิสระ ไม่บีบตัวหนังสือ
+        st.markdown(
+            f"""
+            <div style="width: 100%; overflow-x: auto; overflow-y: auto; border: 1px solid #334155; border-radius: 8px; padding: 10px; background: #0f172a;">
+                <img src="{img_data_url}" style="width: {zoom_level}%; max-width: none; height: auto; display: block;" />
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     else:
         st.error("ไม่พบไฟล์รูปภาพ")
     
-    st.stop()  # หยุดการโหลดส่วนอื่นเพื่อให้แสดงรูปเต็มหน้าจออย่างเดียว
+    st.stop()
 
 # ==============================================================================
-# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด (หน้าหลักด้านบน)
+# ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด
 # ==============================================================================
 st.title("📊 Trading Performance Dashboard")
 
 if df.empty:
-    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก ระบบจะเริ่มคำนวณสถิติและวาดกราฟทันที")
+    st.info("💡 ยังไม่มีข้อมูลการเทรดในระบบ เลื่อนลงไปด้านล่างเพื่อบันทึกไม้แรก")
 else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
@@ -105,11 +135,10 @@ else:
 st.divider()
 
 # ==============================================================================
-# ส่วนที่ 2: บันทึกการเทรด และ ประวัติจัดการข้อมูล (ด้านล่าง)
+# ส่วนที่ 2: บันทึกการเทรด และ ประวัติจัดการข้อมูล
 # ==============================================================================
 tab_new, tab_history = st.tabs(["📝 บันทึกการเทรดใหม่", "📋 ประวัติการเทรดและจัดการ (แก้ไข/ลบ)"])
 
-# ----------------- แท็บที่ 1: บันทึกการเทรดใหม่ -----------------
 with tab_new:
     st.subheader("📝 บันทึกการเทรดใหม่")
     with st.form("new_trade_form", clear_on_submit=True):
@@ -149,7 +178,6 @@ with tab_new:
             st.success("✅ บันทึกข้อมูลเรียบร้อย!")
             st.rerun()
 
-# ----------------- แท็บที่ 2: ประวัติการเทรด & แก้ไข & ลบ -----------------
 with tab_history:
     st.subheader("📋 รายการประวัติการเทรดทั้งหมด")
     if df.empty:
