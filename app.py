@@ -28,30 +28,27 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# ฟังก์ชันเปิดหน้าต่างป๊อปอัปขยายภาพเต็มจอแบบกว้างพิเศษ (95% Screen Width)
-@st.dialog("🔍 ภาพชาร์ตขนาดเต็ม", width="large")
-def show_full_image(img_path, title):
-    st.markdown(
-        """
-        <style>
-        div[role="dialog"] {
-            width: 95vw !important;
-            max-width: 95vw !important;
-        }
-        div[role="dialog"] img {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 85vh !important;
-            object-fit: contain !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    st.caption(f"**{title}**")
-    st.image(img_path, use_container_width=True)
-
 df = load_data()
+
+# ==============================================================================
+# โหมดดูภาพขนาดใหญ่เต็มจอ (Full View Mode)
+# ==============================================================================
+if st.session_state.get("view_fullscreen_img"):
+    img_info = st.session_state["view_fullscreen_img"]
+    
+    col_btn, _ = st.columns([1, 4])
+    with col_btn:
+        if st.button("🔙 ✖ ปิดรูปภาพ / กลับหน้าหลัก", use_container_width=True):
+            st.session_state["view_fullscreen_img"] = None
+            st.rerun()
+
+    st.subheader(f"🔍 รายละเอียดชาร์ต: {img_info['title']}")
+    if os.path.exists(img_info["path"]):
+        st.image(img_info["path"], use_container_width=True)
+    else:
+        st.error("ไม่พบไฟล์รูปภาพ")
+    
+    st.stop()  # หยุดการโหลดส่วนอื่นเพื่อให้แสดงรูปเต็มหน้าจออย่างเดียว
 
 # ==============================================================================
 # ส่วนที่ 1: แดชบอร์ดและกราฟสถิติการเทรด (หน้าหลักด้านบน)
@@ -64,7 +61,6 @@ else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
 
-    # คำนวณ R สุทธิ: WIN = +R:R, LOSS = -1.0 R, BE = 0 R
     def calc_net_r(row):
         res = str(row["ผลลัพธ์"]).upper()
         if res == "WIN":
@@ -198,7 +194,11 @@ with tab_history:
                     if img_path and os.path.exists(img_path):
                         st.image(img_path, caption="รูปชาร์ตประกอบ", use_container_width=True)
                         if st.button("🔍 ดูภาพขยายเต็มจอ", key=f"view_img_{trade_id}", use_container_width=True):
-                            show_full_image(img_path, f"{row['สินทรัพย์']} - {row['ระบบเทรด']} ({row['ผลลัพธ์']})")
+                            st.session_state["view_fullscreen_img"] = {
+                                "path": img_path,
+                                "title": f"{row['สินทรัพย์']} | {row['ระบบเทรด']} | {row['ผลลัพธ์']} ({row['เวลา']})"
+                            }
+                            st.rerun()
                     else:
                         st.caption("ไม่มีรูปภาพแนบสำหรับไม้นี้")
 
