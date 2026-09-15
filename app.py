@@ -38,11 +38,19 @@ def get_image_base64_url(img_path):
     return f"data:{mime};base64,{encoded}"
 
 # ==============================================================================
-# CSS สไตล์โมเดิร์น คมชัด อ่านง่ายทุกส่วน
+# CSS ปรับแต่งสีและตัวหนังสือให้ชัดเจนทุกจุด
 # ==============================================================================
 st.markdown(
     """
     <style>
+    /* ปรับแต่ง Label ของ Input / Select ทุกช่องให้อ่านง่าย ชัดเจน */
+    label[data-testid="stWidgetLabel"] p {
+        color: #0f172a !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+    }
+    
+    /* กล่อง Header ด้านบน */
     .header-box {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid #475569;
@@ -50,20 +58,21 @@ st.markdown(
         border-radius: 12px;
         padding: 18px 24px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
     }
     .header-box h1 {
         color: #ffffff !important;
         font-size: 26px !important;
         font-weight: 800 !important;
         margin: 0 !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .header-box p {
         color: #cbd5e1 !important;
         font-size: 14px !important;
         margin: 6px 0 0 0 !important;
     }
+    
+    /* แถบหัวข้อ Section */
     .section-title {
         background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid #475569;
@@ -74,28 +83,48 @@ st.markdown(
         font-size: 18px !important;
         font-weight: 800 !important;
         margin: 18px 0 14px 0;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
+    
+    /* การ์ดสรุปตัวเลขสถิติ */
     .metric-card {
         background: #1e293b;
         border: 1px solid #475569;
         border-radius: 10px;
         padding: 16px 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
         margin-bottom: 12px;
     }
     .metric-label {
-        color: #e2e8f0 !important;
-        font-size: 15px !important;
+        color: #cbd5e1 !important;
+        font-size: 14px !important;
         font-weight: 700 !important;
         margin-bottom: 6px;
-        letter-spacing: 0.5px;
     }
     .metric-value {
         color: #fb923c !important;
         font-size: 28px !important;
         font-weight: 900 !important;
         line-height: 1.2;
+    }
+    
+    /* กล่องรายละเอียดประวัติการเทรด */
+    .trade-card {
+        background: #0f172a !important;
+        padding: 16px 20px !important;
+        border-radius: 10px !important;
+        border: 1px solid #334155 !important;
+        margin-bottom: 12px !important;
+    }
+    .trade-card p {
+        color: #f8fafc !important;
+        font-size: 15px !important;
+        margin: 6px 0 !important;
+    }
+    .trade-card b {
+        color: #94a3b8 !important;
+        font-weight: 700 !important;
+        display: inline-block;
+        width: 100px;
     }
     </style>
     """,
@@ -182,7 +211,6 @@ else:
     be_rate = (bes / total_trades) * 100 if total_trades > 0 else 0
     total_r = df_calc["Net_R"].sum()
 
-    # การ์ดสถิติแบบ Custom HTML เห็นตัวหนังสือสีขาวและส้มชัดเจน 100%
     m1, m2, m3, m4 = st.columns(4)
     m1.markdown(
         f"""
@@ -260,7 +288,7 @@ else:
             </svg>
             <div style="margin-top:-125px; margin-bottom:50px;">
                 <span style="font-size:26px; font-weight:900; color:#ffffff;">{win_rate:.1f}%</span><br>
-                <span style="font-size:13px; color:#e2e8f0; font-weight:700;">WIN RATE</span>
+                <span style="font-size:13px; color:#cbd5e1; font-weight:700;">WIN RATE</span>
             </div>
             <div style="display:flex; justify-content:center; gap:16px; font-size:13px; font-weight:700; margin-top:20px;">
                 <span style="color:#22c55e;">● ชนะ ({win_rate:.0f}%)</span>
@@ -332,13 +360,13 @@ else:
             with c1:
                 st.markdown(
                     f"""
-                    <div style="background:#0f172a; padding:14px; border-radius:8px; border-left:4px solid {badge_color}; margin-bottom:12px;">
-                        <p style="margin:2px 0;"><b>รหัสอ้างอิง:</b> <code>{trade_id}</code></p>
-                        <p style="margin:2px 0;"><b>เวลา:</b> {row['เวลา']}</p>
-                        <p style="margin:2px 0;"><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
-                        <p style="margin:2px 0;"><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
-                        <p style="margin:2px 0;"><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:bold;">{row['ผลลัพธ์']}</span></p>
-                        <p style="margin:2px 0;"><b>R:R:</b> {row['R:R']}</p>
+                    <div class="trade-card" style="border-left: 5px solid {badge_color} !important;">
+                        <p><b>รหัสอ้างอิง:</b> <code style="color:#fb923c;">{trade_id}</code></p>
+                        <p><b>วัน-เวลา:</b> {row['เวลา']}</p>
+                        <p><b>สินทรัพย์:</b> {row['สินทรัพย์']}</p>
+                        <p><b>ระบบเทรด:</b> {row['ระบบเทรด']}</p>
+                        <p><b>ผลลัพธ์:</b> <span style="color:{badge_color}; font-weight:800; font-size:16px;">{row['ผลลัพธ์']}</span></p>
+                        <p><b>R:R:</b> {row['R:R']}</p>
                     </div>
                     """,
                     unsafe_allow_html=True
