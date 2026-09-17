@@ -44,13 +44,10 @@ def get_image_base64_url(img_path):
     encoded = base64.b64encode(data).decode()
     return f"data:{mime};base64,{encoded}"
 
-# ฟังก์ชันดึงชั่วโมงจากข้อความเวลาที่ผู้ใช้บันทึกจริง
 def extract_hour_range(time_str):
     if not time_str or pd.isna(time_str):
         return "ไม่ระบุเวลา"
     val = str(time_str).strip()
-    
-    # พยายามแปลงแบบ datetime ปกติ
     try:
         dt = pd.to_datetime(val)
         h = dt.hour
@@ -58,14 +55,12 @@ def extract_hour_range(time_str):
     except Exception:
         pass
 
-    # หากมีรูปแบบเช่น 08:30 หรือ 8:00 หรือ 08.30
     match = re.search(r'(\b\d{1,2})[:.](\d{2})', val)
     if match:
         h = int(match.group(1))
         if 0 <= h <= 23:
             return f"{h:02d}:00 - {(h+1)%24:02d}:00"
             
-    # กรณีพิมพ์แค่เลขชั่วโมงเดี่ยวๆ เช่น 8 หรือ 08
     match_single = re.search(r'\b(\d{1,2})\b', val)
     if match_single:
         h = int(match_single.group(1))
@@ -107,7 +102,7 @@ def render_donut_chart(win_rate, loss_rate, be_rate, title="WIN RATE"):
     </div>
     """
 
-# สไตล์
+# ส่วนตกแต่ง CSS
 st.markdown(
     """
     <style>
@@ -276,7 +271,7 @@ else:
     df_calc = df.copy()
     df_calc["R:R"] = pd.to_numeric(df_calc["R:R"], errors="coerce").fillna(0.0)
 
-    # นำเวลาที่ผู้ใช้บันทึกจริงมาแปลงเป็นช่วงเวลา 1 ชั่วโมง
+    # จัดช่วงเวลา 1 ชั่วโมง
     df_calc["ช่วงเวลา_1ชม"] = df_calc["เวลา"].apply(extract_hour_range)
 
     def calc_net_r(row):
@@ -357,7 +352,6 @@ else:
     with col_f_chart:
         st.markdown(render_donut_chart(f_wr, f_lr, f_br, "TREND"), unsafe_allow_html=True)
 
-    # ส่วนวิเคราะห์ช่วงเวลา 1 ชั่วโมง
     st.markdown('<div class="section-title">⏰ สถิติการเทรดแยกตามช่วงเวลา (รอบละ 1 ชั่วโมง จากเวลาที่บันทึก)</div>', unsafe_allow_html=True)
 
     def summarize_hour_group(group):
@@ -398,14 +392,23 @@ else:
     chart_data = df_calc[["เวลา", "Cumulative_R"]].set_index("เวลา")
     st.line_chart(chart_data)
 
-# ส่วนบันทึกการเทรดใหม่
+# บันทึกการเทรดใหม่ (ปรับใช้ date_input และ time_input อัตโนมัติ)
 st.markdown('<div class="section-title">📝 บันทึกการเทรดใหม่</div>', unsafe_allow_html=True)
 
 with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอร์มบันทึกข้อมูลไม้ใหม่", expanded=True):
     with st.form("new_trade_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            trade_time = st.text_input("วัน-เวลาที่เทรด (เช่น 2026-09-15 08:30 หรือพิมพ์เฉพาะเวลา 08:30)", value="")
+            now_th = get_now_th()
+            c_date, c_time = st.columns(2)
+            with c_date:
+                selected_date = st.date_input("📅 วันที่เทรด", value=now_th.date())
+            with c_time:
+                selected_time = st.time_input("⏰ เวลาที่เทรด", value=now_th.time())
+            
+            # รวมวันที่และเวลาเป็นข้อความมาตรฐาน YYYY-MM-DD HH:MM
+            trade_time = f"{selected_date.strftime('%Y-%m-%d')} {selected_time.strftime('%H:%M')}"
+
             symbol = st.selectbox("สินทรัพย์ที่เทรด", ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"])
             strategy = st.selectbox("ระบบเทรด", ["ไวคอฟ (Wyckoff)", "โฟโลเทรน (Follow Trend)", "อื่นๆ"])
         with col2:
@@ -416,9 +419,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
         submitted = st.form_submit_button("💾 ยืนยันบันทึกการเทรด", use_container_width=True)
 
         if submitted:
-            # ถ้าไม่กรอก ให้ใช้เวลาปัจจุบันของไทย
-            final_time = trade_time.strip() if trade_time.strip() else get_now_th().strftime("%Y-%m-%d %H:%M")
-            
+            final_time = trade_time
             image_path = ""
             new_id = f"T_{int(datetime.now().timestamp() * 1000)}"
             if uploaded_image is not None:
@@ -442,7 +443,7 @@ with st.expander("➕ คลิกเพื่อเปิด / ปิดฟอ�
             st.success("✅ บันทึกข้อมูลเรียบร้อยแล้ว!")
             st.rerun()
 
-# ประวัติบันทึกการเทรด
+# ประวัติบันทึกการเทรดทั้งหมด (ปรับฟอร์มแก้ไขให้เป็น date_input & time_input เช่นกัน)
 st.markdown(f'<div class="section-title">📋 ประวัติบันทึกการเทรดทั้งหมด ({len(df)} ไม้)</div>', unsafe_allow_html=True)
 
 if df.empty:
@@ -460,7 +461,6 @@ else:
             trade_time_val = str(row["เวลา"]).strip()
             badge_color = "#22c55e" if row["ผลลัพธ์"] == "WIN" else ("#ef4444" if row["ผลลัพธ์"] == "LOSS" else "#eab308")
             
-            # คำนวณช่วงชั่วโมงจากเวลาที่บันทึก
             hr_range = extract_hour_range(trade_time_val)
             hour_badge = f"⏰ {hr_range}" if hr_range != "ไม่ระบุเวลา" else ""
 
@@ -518,8 +518,20 @@ else:
                     st.markdown("---")
                     st.write("**📝 ฟอร์มแก้ไขข้อมูล:**")
                     with st.form(key=f"form_edit_{tab_prefix}_{trade_id}"):
-                        e_time = st.text_input("เวลาที่เทรด (เช่น 2026-09-15 08:30)", value=trade_time_val)
-                        
+                        try:
+                            init_dt = pd.to_datetime(trade_time_val)
+                            init_d = init_dt.date()
+                            init_t = init_dt.time()
+                        except Exception:
+                            init_d = get_now_th().date()
+                            init_t = get_now_th().time()
+
+                        ec_date, ec_time = st.columns(2)
+                        with ec_date:
+                            e_date = st.date_input("📅 วันที่", value=init_d, key=f"edit_d_{tab_prefix}_{trade_id}")
+                        with ec_time:
+                            e_clock = st.time_input("⏰ เวลา", value=init_t, key=f"edit_t_{tab_prefix}_{trade_id}")
+
                         symbol_list = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100", "อื่นๆ"]
                         s_idx = symbol_list.index(row["สินทรัพย์"]) if row["สินทรัพย์"] in symbol_list else len(symbol_list)-1
                         e_symbol = st.selectbox("สินทรัพย์", symbol_list, index=s_idx)
@@ -536,7 +548,7 @@ else:
 
                         save_edit = st.form_submit_button("💾 ยืนยันการแก้ไข", use_container_width=True)
                         if save_edit:
-                            df.loc[df["id"] == trade_id, "เวลา"] = e_time.strip()
+                            df.loc[df["id"] == trade_id, "เวลา"] = f"{e_date.strftime('%Y-%m-%d')} {e_clock.strftime('%H:%M')}"
                             df.loc[df["id"] == trade_id, "สินทรัพย์"] = e_symbol
                             df.loc[df["id"] == trade_id, "ระบบเทรด"] = e_strategy
                             df.loc[df["id"] == trade_id, "ผลลัพธ์"] = e_result
